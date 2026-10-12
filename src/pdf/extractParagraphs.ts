@@ -9,6 +9,14 @@ export type Paragraph = {
   text: string
   startPage: number
   endPage: number
+  isHeading: boolean
+}
+
+export type ExtractedPdf = {
+  title: string
+  author: string
+  numPages: number
+  paragraphs: Paragraph[]
 }
 
 type Line = {
@@ -21,12 +29,10 @@ type Line = {
 
 export class ExtractionError extends Error {}
 
-export async function extractParagraphs(
-  file: File,
+export async function extractPdf(
+  data: Uint8Array,
   onProgress?: (page: number, total: number) => void,
-): Promise<Paragraph[]> {
-  const data = new Uint8Array(await file.arrayBuffer())
-
+): Promise<ExtractedPdf> {
   const loadingTask = getDocument({ data })
   let pdf
   try {
@@ -38,22 +44,41 @@ export async function extractParagraphs(
     throw new ExtractionError('这个文件打不开，可能不是有效的 PDF。')
   }
 
-  const result: Paragraph[] = []
+  const paragraphs: Paragraph[] = []
+  let fontTitle = ''
+  let info: Record<string, unknown> = {}
   try {
+    info = ((await pdf.getMetadata()).info ?? {}) as Record<string, unknown>
+
     for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
       onProgress?.(pageNumber, pdf.numPages)
       const page = await pdf.getPage(pageNumber)
       const content = await page.getTextContent()
       const items = content.items.filter((item): item is TextItem => 'str' in item)
+      const lines = linesFrom(items)
+      if (pageNumber === 1) fontTitle = titleFromLines(lines)
 
-      paragraphsOnPage(linesFrom(items)).forEach((text, i) => {
-        const last = result.at(-1)
+      paragraphsOnPage(lines).forEach((text, i) => {
+        const last = paragraphs.at(-1)
         // A paragraph that didn't finish on the previous page continues here.
-        if (i === 0 && last && last.endPage === pageNumber - 1 && !endsSentence(last.text)) {
+        if (
+          i === 0 &&
+          last &&
+          last.endPage === pageNumber - 1 &&
+          !last.isHeading &&
+          !isHeadingText(text) &&
+          !endsSentence(last.text)
+        ) {
           last.text = join(last.text, text)
           last.endPage = pageNumber
         } else {
-          result.push({ id: result.length, text, startPage: pageNumber, endPage: pageNumber })
+          paragraphs.push({
+            id: paragraphs.length,
+            text,
+            startPage: pageNumber,
+            endPage: pageNumber,
+            isHeading: isHeadingText(text),
+          })
         }
       })
       page.cleanup()
@@ -62,10 +87,50 @@ export async function extractParagraphs(
     await loadingTask.destroy()
   }
 
-  if (result.length === 0) {
+  if (paragraphs.length === 0) {
     throw new ExtractionError('没有找到可提取的文字。它可能是扫描版（图片）PDF。')
   }
-  return result
+
+  const metaTitle = typeof info.Title === 'string' ? info.Title.trim() : ''
+  const author = typeof info.Author === 'string' ? info.Author.trim() : ''
+  return {
+    title: isUsableMetaTitle(metaTitle) ? metaTitle : fontTitle,
+    author,
+    numPages: pdf.numPages,
+    paragraphs,
+  }
+}
+
+export function isHeadingText(text: string): boolean {
+  if (text.length > 80 || /[.:;,]$/.test(text)) return false
+  return NAMED_HEADING.test(text) || NUMBERED_HEADING.test(text)
+}
+
+const NAMED_HEADING =
+  /^(abstract|introduction|related work|background|methods?|methodology|experiments?|results|discussion|conclusions?|references|bibliography|acknowledge?ments?|appendix\b.*)$/i
+const NUMBERED_HEADING = /^(\d+(\.\d+)*\.?|[IVX]+\.|[A-H](\.\d+)+|[A-H]\.)\s+\p{Lu}/u
+
+function isUsableMetaTitle(title: string): boolean {
+  return (
+    title.length >= 6 &&
+    !/\.(pdf|docx?|dvi|tex)$/i.test(title) &&
+    !/^(microsoft word|untitled)/i.test(title)
+  )
+}
+
+// The title is usually the run of lines set in the largest font on the first page.
+function titleFromLines(lines: Line[]): string {
+  const candidates = lines.filter((l) => l.text.length > 3)
+  if (candidates.length === 0) return ''
+  const largest = Math.max(...candidates.map((l) => l.height))
+  if (largest < median(lines.map((l) => l.height)) * 1.3) return ''
+
+  const start = lines.findIndex((l) => l.height >= largest * 0.95 && l.text.length > 3)
+  let title = lines[start].text
+  for (let i = start + 1; i < lines.length && lines[i].height >= largest * 0.95; i++) {
+    title = join(title, lines[i].text)
+  }
+  return title.length <= 200 ? title : ''
 }
 
 function linesFrom(items: TextItem[]): Line[] {
@@ -88,6 +153,8 @@ function linesFrom(items: TextItem[]): Line[] {
   }
 
   for (const item of items) {
+    // Rotated text is margin stamps (like arXiv's sidebar), not body text.
+    if (Math.abs(item.transform[1]) > 0.01 || Math.abs(item.transform[2]) > 0.01) continue
     const x: number = item.transform[4]
     const y: number = item.transform[5]
     const height = item.height || Math.abs(item.transform[3]) || 10
@@ -119,12 +186,13 @@ function paragraphsOnPage(lines: Line[]): string[] {
 
   const lineHeight = median(lines.map((l) => l.height))
   const lineWidth = median(lines.map((l) => l.width))
-  const lineSpacing = median(
-    lines
-      .slice(1)
-      .map((line, i) => lines[i].y - line.y)
-      .filter((d) => d > 0 && d < lineHeight * 3),
-  ) || lineHeight * 1.2
+  const lineSpacing =
+    median(
+      lines
+        .slice(1)
+        .map((line, i) => lines[i].y - line.y)
+        .filter((d) => d > 0 && d < lineHeight * 3),
+    ) || lineHeight * 1.2
 
   const paragraphs: string[] = []
   let current = lines[0].text
@@ -148,6 +216,9 @@ function startsNewParagraph(
   lineWidth: number,
   lineSpacing: number,
 ): boolean {
+  const isHeadingLine = (l: Line) => l.width < lineWidth * 0.7 && isHeadingText(l.text)
+  if (isHeadingLine(line) || isHeadingLine(previous)) return true
+
   const previousIsShort = previous.width < lineWidth * 0.8
   const previousEndsSentence = endsSentence(previous.text)
 
@@ -166,7 +237,11 @@ function join(a: string, b: string): string {
   const last = a.at(-1)
   const first = b.at(0)
   if (!last || !first) return a + b
-  if ('-\u00AD‐'.includes(last) && /\p{Ll}/u.test(first)) return a.slice(0, -1) + b
+  if ('-\u00AD‐'.includes(last) && /\p{Ll}/u.test(first)) {
+    // "English-" + "to-German" is a real compound; "trans-" + "lation" is a split word.
+    const keepHyphen = last !== '\u00AD' && /(^|\s)\p{Lu}\S*.$/u.test(a)
+    return keepHyphen ? a + b : a.slice(0, -1) + b
+  }
   if (isCJK(last) || isCJK(first)) return a + b
   return a + ' ' + b
 }
