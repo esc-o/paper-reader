@@ -1,6 +1,8 @@
 import { getDocument, GlobalWorkerOptions, PasswordException } from 'pdfjs-dist'
 import type { TextItem } from 'pdfjs-dist/types/src/display/api'
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
+import { finalizeParagraphs, parseTocLine } from '../lib/toc'
+import type { TocEntry } from '../lib/toc'
 
 GlobalWorkerOptions.workerSrc = workerUrl
 
@@ -10,6 +12,8 @@ export type Paragraph = {
   startPage: number
   endPage: number
   isHeading: boolean
+  /** A contents-page line. Kept for the chapter list, hidden while reading. */
+  isToc?: boolean
 }
 
 export type ExtractedPdf = {
@@ -17,6 +21,8 @@ export type ExtractedPdf = {
   author: string
   numPages: number
   paragraphs: Paragraph[]
+  toc: TocEntry[]
+  pageOffset: number
 }
 
 type Line = {
@@ -67,6 +73,8 @@ export async function extractPdf(
           last.endPage === pageNumber - 1 &&
           !last.isHeading &&
           !isHeadingText(text) &&
+          !parseTocLine(text) &&
+          !parseTocLine(last.text) &&
           !endsSentence(last.text)
         ) {
           last.text = join(last.text, text)
@@ -93,16 +101,19 @@ export async function extractPdf(
 
   const metaTitle = typeof info.Title === 'string' ? info.Title.trim() : ''
   const author = typeof info.Author === 'string' ? info.Author.trim() : ''
+  const reading = finalizeParagraphs(paragraphs, pdf.numPages)
   return {
     title: isUsableMetaTitle(metaTitle) ? metaTitle : fontTitle,
     author,
     numPages: pdf.numPages,
-    paragraphs,
+    paragraphs: reading.paragraphs,
+    toc: reading.toc,
+    pageOffset: reading.pageOffset,
   }
 }
 
 export function isHeadingText(text: string): boolean {
-  if (text.length > 80 || /[.:;,]$/.test(text)) return false
+  if (parseTocLine(text) || text.length > 80 || /[.:;,]$/.test(text)) return false
   return NAMED_HEADING.test(text) || NUMBERED_HEADING.test(text)
 }
 
@@ -216,6 +227,8 @@ function startsNewParagraph(
   lineWidth: number,
   lineSpacing: number,
 ): boolean {
+  if (parseTocLine(line.text) || parseTocLine(previous.text)) return true
+
   const isHeadingLine = (l: Line) => l.width < lineWidth * 0.7 && isHeadingText(l.text)
   if (isHeadingLine(line) || isHeadingLine(previous)) return true
 

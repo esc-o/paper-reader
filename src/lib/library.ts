@@ -3,6 +3,7 @@ import { extractPdf, ExtractionError } from '../pdf/extractParagraphs'
 import type { Paragraph } from '../pdf/extractParagraphs'
 import { getBook, saveBook } from './db'
 import { routes } from './router'
+import { finalizeParagraphs } from './toc'
 import type { Book } from './types'
 
 export function isPdfFile(file: File): boolean {
@@ -30,6 +31,8 @@ export async function importPdf(
     description: findDescription(pdf.paragraphs),
     numPages: pdf.numPages,
     paragraphs: pdf.paragraphs,
+    toc: pdf.toc,
+    pageOffset: pdf.pageOffset,
     addedAt: Date.now(),
     lastReadAt: null,
     currentPage: 1,
@@ -43,19 +46,53 @@ export function progressPercent(book: Book): number {
 }
 
 export function currentChapter(book: Book): string {
+  const toc = book.toc ?? []
+  if (toc.length > 0) {
+    let chapter = ''
+    for (const entry of toc) {
+      if (entry.pdfPage > book.currentPage) break
+      chapter = entry.title
+    }
+    return chapter
+  }
   let chapter = ''
   for (const p of book.paragraphs) {
     if (p.startPage > book.currentPage) break
-    if (p.isHeading) chapter = p.text
+    if (p.isHeading && !p.isToc) chapter = p.text
   }
   return chapter
 }
 
+/** Fills in the contents list for books imported before contents pages were recognised. */
+export function prepareBook(book: Book): { book: Book; changed: boolean } {
+  const result = finalizeParagraphs(book.paragraphs, book.numPages)
+  const changed =
+    book.pageOffset !== result.pageOffset ||
+    (book.toc?.length ?? -1) !== result.toc.length ||
+    book.paragraphs.some(
+      (paragraph, index) =>
+        !!paragraph.isToc !== !!result.paragraphs[index].isToc ||
+        paragraph.isHeading !== result.paragraphs[index].isHeading,
+    ) ||
+    result.toc.some(
+      (entry, index) =>
+        entry.title !== book.toc?.[index]?.title ||
+        entry.bookPage !== book.toc?.[index]?.bookPage ||
+        entry.pdfPage !== book.toc?.[index]?.pdfPage,
+    )
+  if (!changed) return { book, changed: false }
+  return {
+    changed: true,
+    book: { ...book, paragraphs: result.paragraphs, toc: result.toc, pageOffset: result.pageOffset },
+  }
+}
+
 function findDescription(paragraphs: Paragraph[]): string {
-  const index = paragraphs.findIndex((p) => /^abstract$/i.test(p.text))
-  let text = index >= 0 ? paragraphs[index + 1]?.text : undefined
-  text ??= paragraphs.map((p) => p.text.match(/^abstract[\s.:—–-]+(.{40,})/i)?.[1]).find(Boolean)
-  text ??= paragraphs.find((p) => p.text.length > 200)?.text
+  const body = paragraphs.filter((p) => !p.isToc)
+  const index = body.findIndex((p) => /^abstract$/i.test(p.text))
+  let text = index >= 0 ? body[index + 1]?.text : undefined
+  text ??= body.map((p) => p.text.match(/^abstract[\s.:—–-]+(.{40,})/i)?.[1]).find(Boolean)
+  text ??= body.find((p) => !p.isHeading && p.text.length > 200)?.text
   if (!text) return ''
   return text.length > 300 ? text.slice(0, 300).replace(/\s+\S*$/, '') + '…' : text
 }

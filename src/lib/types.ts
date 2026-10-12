@@ -1,4 +1,5 @@
 import type { Paragraph } from '../pdf/extractParagraphs'
+import type { TocEntry } from './toc'
 
 export type Book = {
   /** SHA-256 of the PDF bytes, so the same file always maps to the same book. */
@@ -9,6 +10,10 @@ export type Book = {
   description: string
   numPages: number
   paragraphs: Paragraph[]
+  /** Chapters parsed from the contents page. Empty when the paper has none. */
+  toc?: TocEntry[]
+  /** Printed page minus PDF page. 0 until a contents page can be matched to headings. */
+  pageOffset?: number
   addedAt: number
   lastReadAt: number | null
   currentPage: number

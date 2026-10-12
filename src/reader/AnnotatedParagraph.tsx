@@ -68,10 +68,6 @@ export const AnnotatedParagraph = memo(function AnnotatedParagraph({
 }: Props) {
   const segments = useMemo(() => buildSegments(paragraph, annotations), [paragraph, annotations])
   const Text = paragraph.isHeading ? 'h3' : 'p'
-  const pages =
-    paragraph.startPage === paragraph.endPage
-      ? `p.${paragraph.startPage}`
-      : `p.${paragraph.startPage}–${paragraph.endPage}`
 
   function handleMarkClick(event: MouseEvent, covering: Annotation[]) {
     if (hasTextSelection()) return
@@ -83,7 +79,6 @@ export const AnnotatedParagraph = memo(function AnnotatedParagraph({
 
   return (
     <div className={`paragraph${paragraph.isHeading ? ' heading' : ''}`}>
-      <span className="page-tag">{pages}</span>
       <Text className="paragraph-text" data-paragraph-id={paragraph.id}>
         {segments.map((segment) => {
           const text = paragraph.text.slice(segment.start, segment.end)

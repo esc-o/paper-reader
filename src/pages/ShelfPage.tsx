@@ -1,22 +1,42 @@
 import { useEffect, useState } from 'react'
 import { DropZone } from '../components/DropZone'
-import { deleteBook, listBooks } from '../lib/db'
+import { deleteBook, listAnnotations, listBooks } from '../lib/db'
 import { importStatusText, progressPercent, useImportPdf } from '../lib/library'
 import { routes } from '../lib/router'
 import { formatLastRead } from '../lib/time'
-import type { Book } from '../lib/types'
+import type { Annotation, Book } from '../lib/types'
+import { ExportDialog } from '../reader/ExportDialog'
 import './ShelfPage.css'
 
 export function ShelfPage() {
   const [books, setBooks] = useState<Book[] | null>(null)
+  const [menuId, setMenuId] = useState<string | null>(null)
+  const [exporting, setExporting] = useState<{ book: Book; annotations: Annotation[] } | null>(null)
   const { state: importState, importAndOpen } = useImportPdf()
   const importStatus = importStatusText(importState)
+
+  useEffect(() => {
+    if (!menuId) return
+    const close = (event: MouseEvent) => {
+      const target = event.target
+      if (target instanceof Node && document.getElementById(`more-${menuId}`)?.contains(target)) return
+      setMenuId(null)
+    }
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
+  }, [menuId])
 
   useEffect(() => {
     listBooks().then(setBooks)
   }, [])
 
+  async function openExport(book: Book) {
+    setMenuId(null)
+    setExporting({ book, annotations: await listAnnotations(book.id) })
+  }
+
   async function remove(book: Book) {
+    setMenuId(null)
     if (!window.confirm(`从书架删除《${book.title}》？它的所有标注也会一起删除。`)) return
     await deleteBook(book.id)
     setBooks((list) => list?.filter((b) => b.id !== book.id) ?? null)
@@ -50,13 +70,37 @@ export function ShelfPage() {
                 </span>
               </a>
               <span className="book-progress">{progressPercent(book)}%</span>
-              <button type="button" className="book-delete" onClick={() => remove(book)}>
-                删除
-              </button>
+              <div className="book-more" id={`more-${book.id}`}>
+                <button
+                  type="button"
+                  className="book-delete"
+                  aria-expanded={menuId === book.id}
+                  onClick={() => setMenuId((current) => (current === book.id ? null : book.id))}
+                >
+                  更多
+                </button>
+                {menuId === book.id && (
+                  <div className="book-menu">
+                    <button type="button" onClick={() => openExport(book)}>
+                      导出笔记
+                    </button>
+                    <button type="button" className="danger" onClick={() => remove(book)}>
+                      删除
+                    </button>
+                  </div>
+                )}
+              </div>
             </li>
           ))}
         </ul>
       </main>
+      {exporting && (
+        <ExportDialog
+          book={exporting.book}
+          annotations={exporting.annotations}
+          onClose={() => setExporting(null)}
+        />
+      )}
     </div>
   )
 }

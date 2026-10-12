@@ -149,7 +149,7 @@ function LookupContent({ result }: { result: LookupResult }) {
           </ol>
         </section>
       ))}
-      <p className="lookup-source">释义来自 Free Dictionary API</p>
+      <p className="lookup-source">释义来自 {entry.source}</p>
     </>
   )
 }
