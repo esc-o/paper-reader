@@ -7,10 +7,34 @@
   display: flex;
   align-items: center;
   gap: 16px;
+  max-width: 100%;
   padding: 16px 24px;
   font-size: 14px;
 }
 
+.shelf-bar-top {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+  min-width: 0;
+}
+
+.site-brand {
+  display: none;
+  color: var(--ink);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.shelf-links {
+  display: flex;
+  align-items: center;
+  order: -1;
+  gap: 16px;
+  min-width: 0;
+}
+
+.shelf-links a,
 .shelf-bar a {
   color: var(--muted);
   font-size: 12px;
@@ -18,11 +42,18 @@
   letter-spacing: 0.14em;
   text-decoration: none;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
+.shelf-links a.active,
+.shelf-links a:hover,
 .shelf-bar a.active,
 .shelf-bar a:hover {
   color: var(--ink);
+}
+
+.shelf {
+  overflow-x: hidden;
 }
 
 .shelf-body {
@@ -32,12 +63,25 @@
   max-width: 1080px;
   margin: 0 auto;
   padding: 8px 24px 64px;
+  min-width: 0;
+}
+
+.shelf-main,
+.folder-pane {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .shelf-main {
-  max-width: none;
   margin: 0;
   padding: 16px 0 0;
+}
+
+.shelf > .shelf-main {
+  box-sizing: border-box;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 8px 24px 64px;
 }
 
 .shelf-title {
@@ -72,6 +116,8 @@
   display: flex;
   align-items: center;
   gap: 16px;
+  min-width: 0;
+  max-width: 100%;
   padding: 16px 0;
   border-bottom: 1px solid var(--line);
 }
@@ -90,6 +136,7 @@
   font-size: 17px;
   font-weight: 700;
   letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
 }
 
 .book-link:hover .book-title {
@@ -97,6 +144,7 @@
 }
 
 .book-meta {
+  min-width: 0;
   overflow: hidden;
   font-size: 13px;
   color: var(--muted);
@@ -394,9 +442,30 @@
 }
 
 @media (max-width: 860px) {
+  .shelf-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 14px 16px 8px;
+  }
+  .shelf-bar-top {
+    order: -1;
+    margin-left: 0;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .shelf-links {
+    order: 0;
+  }
+  .site-brand {
+    display: block;
+  }
   .shelf-body {
-    grid-template-columns: 1fr;
-    padding: 8px 20px 48px;
+    grid-template-columns: minmax(0, 1fr);
+    padding: 8px 16px 48px;
+  }
+  .shelf > .shelf-main {
+    padding: 8px 16px 48px;
   }
   .shelf-tools {
     flex-direction: column;

@@ -18,8 +18,11 @@ type AuthValue = {
 const AuthContext = createContext<AuthValue | null>(null)
 
 export function displayName(user: User): string {
-  const meta = user.user_metadata as { full_name?: string; name?: string }
-  return meta.full_name || meta.name || user.email?.split('@')[0] || ''
+  const meta = user.user_metadata as { given_name?: string; full_name?: string; name?: string }
+  const given = meta.given_name?.trim()
+  const full = given || meta.full_name?.trim() || meta.name?.trim() || ''
+  const first = full.split(/\s+/)[0]
+  return first || user.email?.split('@')[0] || ''
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {

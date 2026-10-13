@@ -18,6 +18,12 @@ const zh = {
     label: '日间或夜间',
     day: '日',
     night: '夜',
+    toNight: '切换到夜间',
+    toDay: '切换到日间',
+  },
+  lang: {
+    toEnglish: '切换到英文',
+    toChinese: '切换到中文',
   },
   home: {
     reading: '正在阅读 · 第 {{page}} / {{total}} 页',

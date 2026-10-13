@@ -20,6 +20,12 @@ const en: Dictionary = {
     label: 'Day or night',
     day: 'Day',
     night: 'Night',
+    toNight: 'Switch to night',
+    toDay: 'Switch to day',
+  },
+  lang: {
+    toEnglish: 'Switch to English',
+    toChinese: 'Switch to Chinese',
   },
   home: {
     reading: 'Reading · page {{page}} / {{total}}',

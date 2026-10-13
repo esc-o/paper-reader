@@ -3,7 +3,34 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
   margin-left: auto;
+}
+
+.top-actions .icon-button,
+.top-actions .lang-switch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.icon-button {
+  width: 28px;
+  height: 28px;
+}
+
+.lang-switch {
+  min-width: 28px;
+  height: 28px;
 }
 
 .lang-toggle {
@@ -29,7 +56,7 @@
 }
 
 .login-button {
-  max-width: 46vw;
+  max-width: min(46vw, 11rem);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

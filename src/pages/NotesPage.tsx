@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { TopActions } from '../components/TopActions'
+import { SiteBar } from '../components/SiteBar'
 import { LIBRARY_EVENT } from '../lib/changes'
 import { listAllAnnotations, listBooks } from '../lib/db'
 import { routes } from '../lib/router'
@@ -33,12 +33,7 @@ export function NotesPage() {
 
   return (
     <div className="shelf">
-      <header className="shelf-bar">
-        <a href={routes.home}>{t('nav.home')}</a>
-        <a href={routes.shelf}>{t('nav.shelf')}</a>
-        <a href={routes.notes} className="active">{t('nav.notes')}</a>
-        <TopActions />
-      </header>
+      <SiteBar active="notes" />
 
       <main className="shelf-main">
         <p className="card-label">{t('notesPage.kicker')}</p>

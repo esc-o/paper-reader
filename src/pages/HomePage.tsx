@@ -3,11 +3,11 @@ import { useTranslation } from 'react-i18next'
 import { TopActions } from '../components/TopActions'
 import { useAuth } from '../lib/auth'
 import { LIBRARY_EVENT } from '../lib/changes'
-import { countAnnotationsByKind, getReadingSeconds, listBooks } from '../lib/db'
+import { countAnnotationsByKind, getReadingSeconds, listBooks, listTags } from '../lib/db'
 import { currentChapter, importStatusText, progressPercent, useImportPdf } from '../lib/library'
 import { routes } from '../lib/router'
 import { currentWeek, dayKey, formatLastRead } from '../lib/time'
-import type { AnnotationKind, Book } from '../lib/types'
+import type { AnnotationKind, Book, Tag } from '../lib/types'
 import './HomePage.css'
 
 type WeekDay = { key: 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun'; minutes: number; isToday: boolean; isFuture: boolean }
@@ -16,20 +16,23 @@ const WEEK_KEYS: WeekDay['key'][] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', '
 
 type HomeData = {
   book: Book | null
+  tags: Tag[]
   week: WeekDay[]
   counts: Record<AnnotationKind, number>
 }
 
 async function loadHomeData(): Promise<HomeData> {
   const days = currentWeek()
-  const [books, counts, seconds] = await Promise.all([
+  const [books, tags, counts, seconds] = await Promise.all([
     listBooks(),
+    listTags(),
     countAnnotationsByKind(),
     getReadingSeconds(days.map(dayKey)),
   ])
   const today = dayKey(new Date())
   return {
     book: books[0] ?? null,
+    tags,
     counts,
     week: days.map((day, i) => ({
       key: WEEK_KEYS[i],
@@ -72,18 +75,23 @@ export function HomePage() {
   const importStatus = importStatusText(importState)
 
   const title = book?.title ?? t('home.startTitle')
-  const description = book ? book.description : t('home.startDescription')
+  const description = book ? '' : t('home.startDescription')
+  const bookTags = book ? (data?.tags ?? []).filter((tag) => book.tagIds?.includes(tag.id)) : []
 
   return (
     <div className="home">
       <section className="home-hero">
         <nav className="home-nav">
-          <span className="home-brand">Paper Reader</span>
-          <a href={routes.home} className="active">{t('nav.home')}</a>
-          <a href={routes.shelf}>{t('nav.shelf')}</a>
-          <a href={routes.notes}>{t('nav.notes')}</a>
-          <div className="home-corner">
-            <TopActions tone="light" />
+          <div className="home-nav-top">
+            <span className="home-brand">Paper Reader</span>
+            <div className="home-corner">
+              <TopActions tone="light" />
+            </div>
+          </div>
+          <div className="home-nav-links">
+            <a href={routes.home} className="active">{t('nav.home')}</a>
+            <a href={routes.shelf}>{t('nav.shelf')}</a>
+            <a href={routes.notes}>{t('nav.notes')}</a>
           </div>
         </nav>
 
@@ -93,7 +101,18 @@ export function HomePage() {
             {book ? t('home.reading', { page: book.currentPage, total: book.numPages }) : t('home.nothing')}
           </p>
           <h1 className={`hero-title${titleSize(title)}`}>{title}</h1>
-          {book?.author && <p className="hero-author">{book.author}</p>}
+          {bookTags.length > 0 && (
+            <p className="hero-tags">
+              {bookTags.map((tag) => (
+                <span key={tag.id} className="hero-tag">
+                  <span className={`tag-dot ${tag.color}`} />
+                  {tag.name}
+                </span>
+              ))}
+            </p>
+          )}
+          {book && <p className="hero-file">{book.fileName}</p>}
+          {book?.author ? <p className="hero-author">{book.author}</p> : null}
           {description && <p className="hero-description">{description}</p>}
           <div className="hero-actions">
             {book?.needsFile ? (

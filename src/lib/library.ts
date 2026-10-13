@@ -2,6 +2,7 @@ import { useState } from 'react'
 import i18n from '../i18n'
 import { extractPdf, ExtractionError } from '../pdf/extractParagraphs'
 import type { Paragraph } from '../pdf/extractParagraphs'
+import { authorsForDoi, doiInText, usableAuthor } from './authors'
 import { notifyLibrary } from './changes'
 import { getBook, saveBook } from './db'
 import { yearInTitle } from './shelfQuery'
@@ -29,11 +30,19 @@ export async function importPdf(
   const now = Date.now()
   const title = pdf.title || file.name.replace(/\.pdf$/i, '')
   const year = existing?.year ?? yearInTitle(title)
+  let author = usableAuthor(pdf.author)
+  if (!author) {
+    const firstPage = pdf.paragraphs.filter((paragraph) => paragraph.startPage === 1).map((paragraph) => paragraph.text).join('\n')
+    const doi = doiInText(firstPage)
+    if (doi) author = usableAuthor(await authorsForDoi(doi))
+  }
+  if (!author) author = existing?.author ?? ''
+  const authorChanged = author !== (existing?.author ?? '')
   await saveBook({
     id,
     fileName: file.name,
     title,
-    author: pdf.author,
+    author,
     description: existing?.description || findDescription(pdf.paragraphs),
     numPages: pdf.numPages,
     paragraphs: pdf.paragraphs,
@@ -43,7 +52,7 @@ export async function importPdf(
     lastReadAt: existing?.lastReadAt ?? null,
     currentPage: existing && existing.currentPage <= pdf.numPages ? existing.currentPage : 1,
     needsFile: false,
-    updatedAt: existing?.updatedAt ?? now,
+    updatedAt: authorChanged || !existing?.updatedAt ? now : existing.updatedAt,
     folderId: existing?.folderId ?? null,
     tagIds: existing?.tagIds ?? [],
     year,

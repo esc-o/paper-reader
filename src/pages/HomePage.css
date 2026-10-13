@@ -20,9 +20,13 @@
 .home-nav {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
   gap: 22px;
   font-size: 13px;
+}
+
+.home-nav-top,
+.home-nav-links {
+  display: contents;
 }
 
 .home-brand {
@@ -37,6 +41,7 @@
   letter-spacing: 0.14em;
   text-decoration: none;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .home-nav a:hover,
@@ -92,13 +97,51 @@
   line-height: 1.1;
 }
 
-.hero-author {
-  margin: 22px 0 0;
+.hero-author,
+.hero-file,
+.hero-tags {
+  margin: 14px 0 0;
   max-width: 460px;
+  overflow-wrap: anywhere;
+}
+
+.hero-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.hero-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hero-file {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.hero-author {
   font-size: 14px;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.85);
 }
+
+.hero-tag .tag-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ffd43b;
+}
+
+.hero-tag .tag-dot.green { background: #69db7c; }
+.hero-tag .tag-dot.pink { background: #f783ac; }
+.hero-tag .tag-dot.blue { background: #74c0fc; }
+.hero-tag .tag-dot.orange { background: #ff922b; }
+.hero-tag .tag-dot.purple { background: #b197fc; }
 
 .hero-description {
   display: -webkit-box;
@@ -376,9 +419,30 @@
 @media (max-width: 860px) {
   .home {
     grid-template-columns: 1fr;
+    overflow-x: hidden;
+  }
+  .home-nav {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .home-nav-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-width: 0;
+  }
+  .home-nav-links {
+    display: flex;
+    gap: 18px;
+  }
+  .home-corner {
+    position: static;
+    margin-left: 0;
   }
   .home-hero {
-    padding: 22px 24px 26px;
+    padding: 22px 16px 26px;
   }
   .hero-main {
     padding: 44px 0 36px;

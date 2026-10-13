@@ -1,4 +1,6 @@
 .dropzone {
+  box-sizing: border-box;
+  max-width: 100%;
   padding: 36px 20px;
   border: 1.5px dashed #cfc6b8;
   border-radius: 8px;
@@ -18,10 +20,12 @@
 .dropzone-title {
   margin: 0;
   font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
 .dropzone-hint {
   margin: 6px 0 0;
   font-size: 13px;
   color: var(--muted);
+  overflow-wrap: anywhere;
 }

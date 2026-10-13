@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { TopActions } from '../components/TopActions'
+import { SiteBar } from '../components/SiteBar'
 import { DropZone } from '../components/DropZone'
 import { LIBRARY_EVENT, notifyLibrary } from '../lib/changes'
 import { deleteBook, deleteFolder, deleteTag, listAnnotations, listBooks, listFolders, listTags, saveBook, saveFolder, saveTag } from '../lib/db'
@@ -228,12 +228,7 @@ export function ShelfPage() {
 
   return (
     <div className="shelf">
-      <header className="shelf-bar">
-        <a href={routes.home}>{t('nav.home')}</a>
-        <a href={routes.shelf} className="active">{t('nav.shelf')}</a>
-        <a href={routes.notes}>{t('nav.notes')}</a>
-        <TopActions />
-      </header>
+      <SiteBar active="shelf" />
 
       <div className="shelf-body">
         {!narrow && (
