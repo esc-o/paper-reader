@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 
-export type Route = { name: 'home' } | { name: 'shelf' } | { name: 'reader'; bookId: string }
+export type Route = { name: 'home' } | { name: 'shelf' } | { name: 'notes' } | { name: 'reader'; bookId: string }
 
 export const routes = {
   home: '#/',
   shelf: '#/shelf',
+  notes: '#/notes',
   reader: (bookId: string) => `#/read/${encodeURIComponent(bookId)}`,
 }
 
@@ -13,6 +14,7 @@ function parse(hash: string): Route {
   const reader = path.match(/^\/read\/(.+)$/)
   if (reader) return { name: 'reader', bookId: decodeURIComponent(reader[1]) }
   if (path === '/shelf') return { name: 'shelf' }
+  if (path === '/notes') return { name: 'notes' }
   return { name: 'home' }
 }
 

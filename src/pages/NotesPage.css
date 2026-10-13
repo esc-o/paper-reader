@@ -1,0 +1,50 @@
+.note-list {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.note-row {
+  border-bottom: 1px solid var(--line);
+}
+
+.note-link {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px 0;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.note-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.note-text {
+  font-size: 16px;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+.note-quote {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.note-book {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.note-link:hover .note-text {
+  text-decoration: underline;
+}

@@ -35,6 +35,97 @@ body {
   margin: 0;
 }
 
+html.appearance-night {
+  color-scheme: dark;
+  background: #141110;
+  color: #f4efe8;
+}
+
+html.appearance-night .home-cards,
+html.appearance-night .shelf {
+  background: #141110;
+  color: #f4efe8;
+}
+
+html.appearance-night .card {
+  background: #221e1b;
+  color: #f4efe8;
+  box-shadow: none;
+}
+
+html.appearance-night .card-progress {
+  background: #243044;
+}
+
+html.appearance-night .card-number,
+html.appearance-night .card-sub,
+html.appearance-night .stat-number,
+html.appearance-night .shelf-title,
+html.appearance-night .book-title,
+html.appearance-night .book-link,
+html.appearance-night .note-link,
+html.appearance-night .note-text {
+  color: #f4efe8;
+}
+
+html.appearance-night .shelf-bar a {
+  color: #b7aea8;
+}
+
+html.appearance-night .shelf-bar a.active,
+html.appearance-night .shelf-bar a:hover,
+html.appearance-night .week-label.today {
+  color: #f4efe8;
+}
+
+html.appearance-night .card-unit,
+html.appearance-night .stat-label,
+html.appearance-night .week-label,
+html.appearance-night .book-meta,
+html.appearance-night .note-kind,
+html.appearance-night .note-quote,
+html.appearance-night .note-book,
+html.appearance-night .card-label,
+html.appearance-night .shelf-empty,
+html.appearance-night .dropzone-hint {
+  color: #b7aea8;
+}
+
+html.appearance-night .progress-track {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+html.appearance-night .progress-fill {
+  background: #f4efe8;
+}
+
+html.appearance-night .book-row,
+html.appearance-night .note-row {
+  border-color: #3a322e;
+}
+
+html.appearance-night .book-menu,
+html.appearance-night .account-menu {
+  background: #2a2421;
+  color: #f4efe8;
+  border-color: #3a322e;
+}
+
+html.appearance-night .dropzone {
+  border-color: #5c534c;
+  color: #f4efe8;
+}
+
+html.appearance-night .stat-dot.comment {
+  background: #f4efe8;
+}
+
+@media (min-width: 861px) {
+  html.appearance-night .home-corner {
+    color: #f4efe8;
+  }
+}
+
 .card-label {
   font-size: 11px;
   font-weight: 600;

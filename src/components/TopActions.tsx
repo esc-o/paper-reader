@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useAppearance } from '../lib/appearance'
 import { displayName, useAuth } from '../lib/auth'
 import './TopActions.css'
 
 export function TopActions({ tone = 'dark' }: { tone?: 'dark' | 'light' }) {
   const { t, i18n } = useTranslation()
   const { user, error, signIn, signOut, clearError } = useAuth()
+  const { mode, setAppearance } = useAppearance()
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
   const lang = i18n.language.startsWith('zh') ? 'zh' : 'en'
@@ -30,6 +32,15 @@ export function TopActions({ tone = 'dark' }: { tone?: 'dark' | 'light' }) {
 
   return (
     <div className={`top-actions tone-${tone}`} ref={rootRef}>
+      <div className="lang-toggle" role="group" aria-label={t('appearance.label')}>
+        <button type="button" className={mode === 'day' ? 'on' : undefined} onClick={() => setAppearance('day')}>
+          {t('appearance.day')}
+        </button>
+        <span aria-hidden="true">/</span>
+        <button type="button" className={mode === 'night' ? 'on' : undefined} onClick={() => setAppearance('night')}>
+          {t('appearance.night')}
+        </button>
+      </div>
       <div className="lang-toggle" role="group" aria-label={lang === 'zh' ? '中 / EN' : '中 / EN'}>
         <button type="button" className={lang === 'zh' ? 'on' : undefined} onClick={() => void i18n.changeLanguage('zh')}>
           中

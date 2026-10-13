@@ -1,4 +1,5 @@
 .home {
+  position: relative;
   display: grid;
   grid-template-columns: 1fr 1fr;
   min-height: 100svh;
@@ -31,7 +32,11 @@
 
 .home-nav a {
   color: rgba(255, 255, 255, 0.6);
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.14em;
   text-decoration: none;
+  text-transform: uppercase;
 }
 
 .home-nav a:hover,
@@ -165,12 +170,25 @@
   color: #ffa8a8;
 }
 
+.home-corner {
+  margin-left: auto;
+  color: #fff;
+}
+
 .hero-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 520px;
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: rgba(255, 255, 255, 0.45);
+}
+
+.hero-footer-note {
+  line-height: 1.5;
 }
 
 /* ---------- Cream cards ---------- */
@@ -343,6 +361,17 @@
 }
 
 /* ---------- Phones: stack vertically ---------- */
+
+@media (min-width: 861px) {
+  .home-corner {
+    position: absolute;
+    top: 28px;
+    right: 48px;
+    z-index: 5;
+    margin-left: 0;
+    color: var(--chocolate);
+  }
+}
 
 @media (max-width: 860px) {
   .home {

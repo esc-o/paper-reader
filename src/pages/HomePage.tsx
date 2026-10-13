@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { TopActions } from '../components/TopActions'
+import { useAuth } from '../lib/auth'
 import { LIBRARY_EVENT } from '../lib/changes'
 import { countAnnotationsByKind, getReadingSeconds, listBooks } from '../lib/db'
 import { currentChapter, importStatusText, progressPercent, useImportPdf } from '../lib/library'
@@ -49,6 +50,7 @@ const STAT_KINDS: ('highlight' | 'underline' | 'comment')[] = ['highlight', 'und
 
 export function HomePage() {
   const { t, i18n } = useTranslation()
+  const { user } = useAuth()
   const [data, setData] = useState<HomeData | null>(null)
   const { state: importState, importAndOpen } = useImportPdf()
   const inputRef = useRef<HTMLInputElement>(null)
@@ -79,7 +81,10 @@ export function HomePage() {
           <span className="home-brand">Paper Reader</span>
           <a href={routes.home} className="active">{t('nav.home')}</a>
           <a href={routes.shelf}>{t('nav.shelf')}</a>
-          <TopActions tone="light" />
+          <a href={routes.notes}>{t('nav.notes')}</a>
+          <div className="home-corner">
+            <TopActions tone="light" />
+          </div>
         </nav>
 
         <div className="hero-main">
@@ -123,7 +128,8 @@ export function HomePage() {
             ? t('home.reimport')
             : book?.lastReadAt
               ? t('home.lastRead', { time: formatLastRead(book.lastReadAt) })
-              : t('home.localOnly')}
+              : null}
+          <span className="hero-footer-note">{user ? t('home.savedAccount') : t('home.localOnly')}</span>
         </footer>
       </section>
 

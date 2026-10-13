@@ -10,8 +10,14 @@ const zh = {
   nav: {
     home: '首页',
     shelf: '书架',
+    notes: '笔记',
     backHome: '← 首页',
     backShelf: '回到书架',
+  },
+  appearance: {
+    label: '日间或夜间',
+    day: '日',
+    night: '夜',
   },
   home: {
     reading: '正在阅读 · 第 {{page}} / {{total}} 页',
@@ -23,7 +29,8 @@ const zh = {
     import: '导入 PDF',
     shelf: '书架 →',
     lastRead: '最近阅读 · {{time}}',
-    localOnly: 'Paper Reader · 数据只存在本机',
+    localOnly: 'Paper Reader · 数据只存在本机。登录后，进度和笔记会存到账号，PDF 仍留在这台设备',
+    savedAccount: 'Paper Reader · 进度和笔记会存到账号。PDF 仍只留在这台设备',
     progress: '阅读进度',
     noChapter: '还没读到带标题的章节',
     week: '本周阅读',
@@ -43,6 +50,12 @@ const zh = {
     fri: '五',
     sat: '六',
     sun: '日',
+  },
+  notesPage: {
+    kicker: 'Notes',
+    title: '笔记',
+    empty: '还没有高亮、划线或评论。',
+    inBook: '来自《{{title}}》',
   },
   shelf: {
     kicker: 'Library',

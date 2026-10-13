@@ -52,7 +52,9 @@ export function ShelfPage() {
   return (
     <div className="shelf">
       <header className="shelf-bar">
-        <a href={routes.home}>{t('nav.backHome')}</a>
+        <a href={routes.home}>{t('nav.home')}</a>
+        <a href={routes.shelf} className="active">{t('nav.shelf')}</a>
+        <a href={routes.notes}>{t('nav.notes')}</a>
         <TopActions />
       </header>
 

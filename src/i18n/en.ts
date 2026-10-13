@@ -12,8 +12,14 @@ const en: Dictionary = {
   nav: {
     home: 'Home',
     shelf: 'Shelf',
+    notes: 'Notes',
     backHome: '← Home',
     backShelf: 'Back to shelf',
+  },
+  appearance: {
+    label: 'Day or night',
+    day: 'Day',
+    night: 'Night',
   },
   home: {
     reading: 'Reading · page {{page}} / {{total}}',
@@ -25,7 +31,8 @@ const en: Dictionary = {
     import: 'Import PDF',
     shelf: 'Shelf →',
     lastRead: 'Last read · {{time}}',
-    localOnly: 'Paper Reader · data stays on this device',
+    localOnly: 'Paper Reader · Data stays on this device. Sign in to save progress and notes. The PDF stays here',
+    savedAccount: 'Paper Reader · Progress and notes are saved to your account. The PDF stays on this device',
     progress: 'Progress',
     noChapter: 'No chapter heading yet',
     week: 'This week',
@@ -45,6 +52,12 @@ const en: Dictionary = {
     fri: 'F',
     sat: 'S',
     sun: 'S',
+  },
+  notesPage: {
+    kicker: 'Notes',
+    title: 'Notes',
+    empty: 'No highlights, underlines, or comments yet.',
+    inBook: 'From {{title}}',
   },
   shelf: {
     kicker: 'Library',

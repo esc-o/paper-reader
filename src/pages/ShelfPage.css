@@ -12,9 +12,17 @@
 }
 
 .shelf-bar a {
-  color: var(--ink);
-  font-weight: 600;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.14em;
   text-decoration: none;
+  text-transform: uppercase;
+}
+
+.shelf-bar a.active,
+.shelf-bar a:hover {
+  color: var(--ink);
 }
 
 .shelf-main {
