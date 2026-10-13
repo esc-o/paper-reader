@@ -25,10 +25,19 @@
   color: var(--ink);
 }
 
-.shelf-main {
-  max-width: 760px;
+.shelf-body {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 12px 32px;
+  max-width: 1080px;
   margin: 0 auto;
-  padding: 24px 24px 64px;
+  padding: 8px 24px 64px;
+}
+
+.shelf-main {
+  max-width: none;
+  margin: 0;
+  padding: 16px 0 0;
 }
 
 .shelf-title {
@@ -154,4 +163,245 @@
 
 .book-menu button.danger {
   color: #c92a2a;
+}
+
+.book-menu {
+  min-width: 220px;
+  max-height: 70vh;
+  overflow: auto;
+}
+
+.folder-pane .card-label {
+  margin: 18px 0 10px;
+}
+
+.folder-list,
+.folder-row,
+.folder-mobile-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.folder-row {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.folder-list > button,
+.folder-row > button:first-child,
+.folder-add,
+.folder-mobile-actions > button {
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 650;
+  text-align: left;
+  cursor: pointer;
+}
+
+.folder-list > button.on,
+.folder-row > button.on {
+  background: rgba(43, 34, 32, 0.08);
+  color: var(--ink);
+}
+
+.folder-mini,
+.folder-mobile-actions > button {
+  padding: 4px 8px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.folder-mini.danger {
+  color: #c92a2a;
+}
+
+.folder-form input,
+.shelf-search,
+.shelf-sort select,
+.folder-select-label select,
+.tag-form input,
+.menu-field select,
+.menu-field input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffdf9;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+}
+
+.folder-select-label,
+.shelf-sort,
+.menu-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 12px;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.shelf-tools {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.shelf-search {
+  flex: 1;
+}
+
+.shelf-sort {
+  width: 160px;
+  margin: 0;
+}
+
+.shelf-sort select {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+}
+
+.tag-bar,
+.book-tags,
+.menu-tags,
+.tag-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.tag-bar {
+  margin-top: 14px;
+}
+
+.book-tags {
+  margin-top: 6px;
+}
+
+.tag-chip-wrap {
+  display: inline-flex;
+  align-items: center;
+}
+
+.tag-chip,
+.tag-add,
+.tag-form button,
+.menu-tags button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.tag-chip.on,
+.menu-tags button.on {
+  border-color: var(--ink);
+  background: rgba(43, 34, 32, 0.06);
+}
+
+.tag-chip.tiny {
+  padding: 1px 6px;
+  font-size: 12px;
+  cursor: default;
+}
+
+.tag-x {
+  margin-left: 2px;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.tag-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.tag-dot.pick {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 2px solid transparent;
+  cursor: pointer;
+}
+
+.tag-dot.pick.on {
+  border-color: var(--ink);
+}
+
+.tag-dot.yellow { background: #ffd43b; }
+.tag-dot.green { background: #69db7c; }
+.tag-dot.pink { background: #f783ac; }
+.tag-dot.blue { background: #74c0fc; }
+.tag-dot.orange { background: #ff922b; }
+.tag-dot.purple { background: #b197fc; }
+
+.tag-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.tag-form input {
+  width: 140px;
+}
+
+.menu-hint {
+  font-size: 13px;
+  letter-spacing: 0;
+  text-transform: none;
+  font-weight: 500;
+}
+
+.menu-field select,
+.menu-field input {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+}
+
+@media (max-width: 860px) {
+  .shelf-body {
+    grid-template-columns: 1fr;
+    padding: 8px 20px 48px;
+  }
+  .shelf-tools {
+    flex-direction: column;
+  }
+  .shelf-sort {
+    width: 100%;
+  }
 }

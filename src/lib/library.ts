@@ -2,8 +2,9 @@ import { useState } from 'react'
 import i18n from '../i18n'
 import { extractPdf, ExtractionError } from '../pdf/extractParagraphs'
 import type { Paragraph } from '../pdf/extractParagraphs'
+import { notifyLibrary } from './changes'
 import { getBook, saveBook } from './db'
-import { routes } from './router'
+import { yearInTitle } from './shelfQuery'
 import { finalizeParagraphs } from './toc'
 import type { Book } from './types'
 
@@ -26,10 +27,12 @@ export async function importPdf(
 
   const pdf = await extractPdf(new Uint8Array(buffer), onProgress)
   const now = Date.now()
+  const title = pdf.title || file.name.replace(/\.pdf$/i, '')
+  const year = existing?.year ?? yearInTitle(title)
   await saveBook({
     id,
     fileName: file.name,
-    title: pdf.title || file.name.replace(/\.pdf$/i, ''),
+    title,
     author: pdf.author,
     description: existing?.description || findDescription(pdf.paragraphs),
     numPages: pdf.numPages,
@@ -41,7 +44,12 @@ export async function importPdf(
     currentPage: existing && existing.currentPage <= pdf.numPages ? existing.currentPage : 1,
     needsFile: false,
     updatedAt: existing?.updatedAt ?? now,
+    folderId: existing?.folderId ?? null,
+    tagIds: existing?.tagIds ?? [],
+    year,
+    classifyUpdatedAt: existing?.classifyUpdatedAt ?? (year ? now : undefined),
   })
+  notifyLibrary()
   return id
 }
 
@@ -112,16 +120,15 @@ export type ImportState =
   | { kind: 'loading'; page: number; total: number }
   | { kind: 'error'; message: string }
 
-/** Imports a PDF and opens it in the reader. */
+/** Imports a PDF and leaves the reader closed. */
 export function useImportPdf() {
   const [state, setState] = useState<ImportState>({ kind: 'idle' })
 
-  async function importAndOpen(file: File) {
+  async function importFile(file: File) {
     setState({ kind: 'loading', page: 0, total: 0 })
     try {
-      const id = await importPdf(file, (page, total) => setState({ kind: 'loading', page, total }))
+      await importPdf(file, (page, total) => setState({ kind: 'loading', page, total }))
       setState({ kind: 'idle' })
-      window.location.hash = routes.reader(id)
     } catch (error) {
       console.error(error)
       const message = error instanceof ExtractionError ? error.message : i18n.t('errors.readFailed')
@@ -129,13 +136,13 @@ export function useImportPdf() {
     }
   }
 
-  return { state, importAndOpen }
+  return { state, importFile }
 }
 
 export function importStatusText(state: ImportState): string | null {
   if (state.kind === 'error') return state.message
   if (state.kind === 'loading') {
-    return state.total > 0 ? i18n.t('errors.readingPage', { page: state.page, total: state.total }) : i18n.t('errors.opening')
+    return state.total > 0 ? i18n.t('errors.readingPage', { page: state.page, total: state.total }) : i18n.t('errors.importing')
   }
   return null
 }

@@ -52,7 +52,7 @@ export function HomePage() {
   const { t, i18n } = useTranslation()
   const { user } = useAuth()
   const [data, setData] = useState<HomeData | null>(null)
-  const { state: importState, importAndOpen } = useImportPdf()
+  const { state: importState, importFile } = useImportPdf()
   const inputRef = useRef<HTMLInputElement>(null)
   const showEyebrow = i18n.language.startsWith('zh')
 
@@ -117,7 +117,7 @@ export function HomePage() {
             hidden
             onChange={(e) => {
               const file = e.target.files?.[0]
-              if (file) importAndOpen(file)
+              if (file) importFile(file)
               e.target.value = ''
             }}
           />

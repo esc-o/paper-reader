@@ -111,9 +111,49 @@ html.appearance-night .account-menu {
   border-color: #3a322e;
 }
 
+html.appearance-night .book-menu button {
+  color: #f4efe8;
+}
+
+html.appearance-night .book-menu button:hover,
+html.appearance-night .account-menu button:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+html.appearance-night .book-menu button.danger {
+  color: #ff8a8a;
+}
+
 html.appearance-night .dropzone {
   border-color: #5c534c;
   color: #f4efe8;
+}
+
+html.appearance-night .folder-form input,
+html.appearance-night .shelf-search,
+html.appearance-night .shelf-sort select,
+html.appearance-night .folder-select-label select,
+html.appearance-night .tag-form input,
+html.appearance-night .menu-field select,
+html.appearance-night .menu-field input {
+  background: #221e1b;
+  color: #f4efe8;
+  border-color: #3a322e;
+}
+
+html.appearance-night .folder-list > button.on,
+html.appearance-night .folder-row > button.on,
+html.appearance-night .tag-chip.on,
+html.appearance-night .menu-tags button.on {
+  background: rgba(255, 255, 255, 0.08);
+  color: #f4efe8;
+}
+
+html.appearance-night .tag-chip,
+html.appearance-night .tag-add,
+html.appearance-night .menu-tags button {
+  color: #f4efe8;
+  border-color: #3a322e;
 }
 
 html.appearance-night .stat-dot.comment {

@@ -1,7 +1,7 @@
 import { openDB } from 'idb'
 import type { DBSchema } from 'idb'
 import { notifyLibrary, notifyLocalChange } from './changes'
-import type { Annotation, AnnotationKind, Book } from './types'
+import type { Annotation, AnnotationKind, Book, Folder, Tag } from './types'
 import { dayKey } from './time'
 
 export type StoredFont = {
@@ -14,7 +14,7 @@ export type StoredFont = {
 
 export type Tombstone = {
   key: string
-  kind: 'book' | 'annotation'
+  kind: 'book' | 'annotation' | 'folder' | 'tag'
   id: string
   bookId?: string
   updatedAt: number
@@ -32,9 +32,11 @@ interface PaperReaderDB extends DBSchema {
   readingTime: { key: string; value: ReadingTimeRecord }
   fonts: { key: string; value: StoredFont }
   tombstones: { key: string; value: Tombstone }
+  folders: { key: string; value: Folder }
+  tags: { key: string; value: Tag }
 }
 
-const dbPromise = openDB<PaperReaderDB>('paper-reader', 2, {
+const dbPromise = openDB<PaperReaderDB>('paper-reader', 3, {
   upgrade(db) {
     if (!db.objectStoreNames.contains('books')) db.createObjectStore('books', { keyPath: 'id' })
     if (!db.objectStoreNames.contains('annotations')) {
@@ -43,6 +45,8 @@ const dbPromise = openDB<PaperReaderDB>('paper-reader', 2, {
     if (!db.objectStoreNames.contains('readingTime')) db.createObjectStore('readingTime', { keyPath: 'date' })
     if (!db.objectStoreNames.contains('fonts')) db.createObjectStore('fonts', { keyPath: 'id' })
     if (!db.objectStoreNames.contains('tombstones')) db.createObjectStore('tombstones', { keyPath: 'key' })
+    if (!db.objectStoreNames.contains('folders')) db.createObjectStore('folders', { keyPath: 'id' })
+    if (!db.objectStoreNames.contains('tags')) db.createObjectStore('tags', { keyPath: 'id' })
   },
 })
 
@@ -182,4 +186,58 @@ export async function putTombstone(tombstone: Tombstone): Promise<void> {
 
 export async function deleteTombstone(key: string): Promise<void> {
   await (await dbPromise).delete('tombstones', key)
+}
+
+export async function listFolders(): Promise<Folder[]> {
+  const folders = await (await dbPromise).getAll('folders')
+  return folders.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
+}
+
+export async function saveFolder(folder: Folder): Promise<void> {
+  await (await dbPromise).put('folders', folder)
+  notifyLocalChange()
+}
+
+export async function removeFolderLocal(id: string): Promise<void> {
+  await (await dbPromise).delete('folders', id)
+}
+
+export async function deleteFolder(id: string): Promise<void> {
+  const now = Date.now()
+  await putTombstone({ key: `folder:${id}`, kind: 'folder', id, updatedAt: now })
+  await removeFolderLocal(id)
+  const books = await (await dbPromise).getAll('books')
+  for (const book of books) {
+    if (book.folderId === id) await saveBook({ ...book, folderId: null, classifyUpdatedAt: now })
+  }
+  notifyLocalChange()
+  notifyLibrary()
+}
+
+export async function listTags(): Promise<Tag[]> {
+  const tags = await (await dbPromise).getAll('tags')
+  return tags.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
+}
+
+export async function saveTag(tag: Tag): Promise<void> {
+  await (await dbPromise).put('tags', tag)
+  notifyLocalChange()
+}
+
+export async function removeTagLocal(id: string): Promise<void> {
+  await (await dbPromise).delete('tags', id)
+}
+
+export async function deleteTag(id: string): Promise<void> {
+  const now = Date.now()
+  await putTombstone({ key: `tag:${id}`, kind: 'tag', id, updatedAt: now })
+  await removeTagLocal(id)
+  const books = await (await dbPromise).getAll('books')
+  for (const book of books) {
+    if (book.tagIds?.includes(id)) {
+      await saveBook({ ...book, tagIds: book.tagIds.filter((tagId) => tagId !== id), classifyUpdatedAt: now })
+    }
+  }
+  notifyLocalChange()
+  notifyLibrary()
 }

@@ -21,6 +21,31 @@ export type Book = {
   needsFile?: boolean
   /** When progress or book metadata last changed. Used to merge devices. */
   updatedAt?: number
+  /** One folder, or none. */
+  folderId?: string | null
+  tagIds?: string[]
+  /** Publication year, when the reader has set one. */
+  year?: number | null
+  /** When the folder, tags, or year last changed. Kept apart from reading progress. */
+  classifyUpdatedAt?: number
+}
+
+export type Folder = {
+  id: string
+  name: string
+  createdAt: number
+  updatedAt: number
+}
+
+export const TAG_COLORS = ['yellow', 'green', 'pink', 'blue', 'orange', 'purple'] as const
+export type TagColor = (typeof TAG_COLORS)[number]
+
+export type Tag = {
+  id: string
+  name: string
+  color: TagColor
+  createdAt: number
+  updatedAt: number
 }
 
 export const HIGHLIGHT_COLORS = ['yellow', 'green', 'pink', 'blue'] as const

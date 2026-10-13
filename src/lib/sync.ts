@@ -1,16 +1,23 @@
-import type { Annotation, Book } from './types'
+import type { Annotation, Book, Folder, Tag, TagColor } from './types'
+import { TAG_COLORS } from './types'
 import type { ReadingTimeRecord, Tombstone } from './db'
 import {
   deleteTombstone,
   listAllAnnotations,
   listBooks,
+  listFolders,
   listReadingTime,
+  listTags,
   listTombstones,
   removeAnnotationLocal,
   removeBookLocal,
+  removeFolderLocal,
+  removeTagLocal,
   saveAnnotation,
   saveBook,
+  saveFolder,
   saveReadingTime,
+  saveTag,
 } from './db'
 import { runSilently, notifyLibrary } from './changes'
 import { loadSettings, saveSettings, syncedSettings } from './settings'
@@ -83,6 +90,13 @@ async function merge(userId: string): Promise<void> {
   await mergeAnnotations(userId)
   await mergeSettings(userId)
   await mergeReadingTime(userId)
+  try {
+    await mergeFolders(userId)
+    await mergeTags(userId)
+    await mergeLabels(userId)
+  } catch (error) {
+    console.error(error)
+  }
 }
 
 function ms(value: string | null | undefined): number {
@@ -185,6 +199,7 @@ async function pushDeletedBook(userId: string, id: string, stamp: number): Promi
     { onConflict: 'user_id,id' },
   )
   if (error) throw error
+  await client.from('book_labels').delete().eq('user_id', userId).eq('book_id', id)
 }
 
 async function applyBook(local: Book, row: RemoteBook): Promise<void> {
@@ -374,6 +389,220 @@ async function mergeReadingTime(userId: string): Promise<void> {
     if (localDates.has(row.date)) continue
     await saveReadingTime({ date: row.date, seconds: row.seconds, updatedAt: ms(row.updated_at) })
   }
+}
+
+type RemoteFolder = { id: string; name: string; updated_at: string; deleted_at: string | null; created_at: string | null }
+type RemoteTag = RemoteFolder & { color: string }
+type RemoteLabel = {
+  book_id: string
+  folder_id: string | null
+  tag_ids: string[] | null
+  year: number | null
+  updated_at: string
+}
+
+function tagColor(value: string): TagColor {
+  return TAG_COLORS.includes(value as TagColor) ? (value as TagColor) : 'yellow'
+}
+
+async function mergeFolders(userId: string): Promise<void> {
+  const client = supabase
+  if (!client) return
+  const { data, error } = await client.from('folders').select('*').eq('user_id', userId)
+  if (error) throw error
+  const remote = (data ?? []) as RemoteFolder[]
+  const remoteById = new Map(remote.map((row) => [row.id, row]))
+  const local = await listFolders()
+  const localIds = new Set(local.map((folder) => folder.id))
+  const tombs = new Map(
+    (await listTombstones()).filter((tomb) => tomb.kind === 'folder').map((tomb) => [tomb.id, tomb]),
+  )
+
+  for (const folder of local) {
+    const row = remoteById.get(folder.id)
+    if (row?.deleted_at && ms(row.deleted_at) >= folder.updatedAt) {
+      await removeFolderLocal(folder.id)
+      continue
+    }
+    if (!row || folder.updatedAt > ms(row.updated_at)) await pushFolder(userId, folder)
+    else if (!row.deleted_at && ms(row.updated_at) > folder.updatedAt) await saveFolder(folderFrom(row))
+  }
+
+  for (const [id, tomb] of tombs) {
+    const row = remoteById.get(id)
+    if (!row || tomb.updatedAt > ms(row.updated_at)) await pushDeletedFolder(userId, tomb)
+    else if (!row.deleted_at && ms(row.updated_at) > tomb.updatedAt) {
+      await deleteTombstone(tomb.key)
+      await saveFolder(folderFrom(row))
+    }
+  }
+
+  for (const row of remote) {
+    if (row.deleted_at || localIds.has(row.id) || tombs.has(row.id)) continue
+    await saveFolder(folderFrom(row))
+  }
+}
+
+function folderFrom(row: RemoteFolder): Folder {
+  return { id: row.id, name: row.name, createdAt: ms(row.created_at) || ms(row.updated_at), updatedAt: ms(row.updated_at) }
+}
+
+async function pushFolder(userId: string, folder: Folder): Promise<void> {
+  const client = supabase
+  if (!client) return
+  const when = new Date(folder.updatedAt).toISOString()
+  const { error } = await client.from('folders').upsert(
+    { user_id: userId, id: folder.id, name: folder.name, created_at: new Date(folder.createdAt).toISOString(), updated_at: when, deleted_at: null },
+    { onConflict: 'user_id,id' },
+  )
+  if (error) throw error
+}
+
+async function pushDeletedFolder(userId: string, tomb: Tombstone): Promise<void> {
+  const client = supabase
+  if (!client) return
+  const when = new Date(tomb.updatedAt).toISOString()
+  const { error } = await client.from('folders').upsert(
+    { user_id: userId, id: tomb.id, name: '', created_at: when, updated_at: when, deleted_at: when },
+    { onConflict: 'user_id,id' },
+  )
+  if (error) throw error
+}
+
+async function mergeTags(userId: string): Promise<void> {
+  const client = supabase
+  if (!client) return
+  const { data, error } = await client.from('tags').select('*').eq('user_id', userId)
+  if (error) throw error
+  const remote = (data ?? []) as RemoteTag[]
+  const remoteById = new Map(remote.map((row) => [row.id, row]))
+  const local = await listTags()
+  const localIds = new Set(local.map((tag) => tag.id))
+  const tombs = new Map((await listTombstones()).filter((tomb) => tomb.kind === 'tag').map((tomb) => [tomb.id, tomb]))
+
+  for (const tag of local) {
+    const row = remoteById.get(tag.id)
+    if (row?.deleted_at && ms(row.deleted_at) >= tag.updatedAt) {
+      await removeTagLocal(tag.id)
+      continue
+    }
+    if (!row || tag.updatedAt > ms(row.updated_at)) await pushTag(userId, tag)
+    else if (!row.deleted_at && ms(row.updated_at) > tag.updatedAt) await saveTag(tagFrom(row))
+  }
+
+  for (const [id, tomb] of tombs) {
+    const row = remoteById.get(id)
+    if (!row || tomb.updatedAt > ms(row.updated_at)) await pushDeletedTag(userId, tomb)
+    else if (!row.deleted_at && ms(row.updated_at) > tomb.updatedAt) {
+      await deleteTombstone(tomb.key)
+      await saveTag(tagFrom(row))
+    }
+  }
+
+  for (const row of remote) {
+    if (row.deleted_at || localIds.has(row.id) || tombs.has(row.id)) continue
+    await saveTag(tagFrom(row))
+  }
+}
+
+function tagFrom(row: RemoteTag): Tag {
+  return {
+    id: row.id,
+    name: row.name,
+    color: tagColor(row.color),
+    createdAt: ms(row.created_at) || ms(row.updated_at),
+    updatedAt: ms(row.updated_at),
+  }
+}
+
+async function pushTag(userId: string, tag: Tag): Promise<void> {
+  const client = supabase
+  if (!client) return
+  const when = new Date(tag.updatedAt).toISOString()
+  const { error } = await client.from('tags').upsert(
+    {
+      user_id: userId,
+      id: tag.id,
+      name: tag.name,
+      color: tag.color,
+      created_at: new Date(tag.createdAt).toISOString(),
+      updated_at: when,
+      deleted_at: null,
+    },
+    { onConflict: 'user_id,id' },
+  )
+  if (error) throw error
+}
+
+async function pushDeletedTag(userId: string, tomb: Tombstone): Promise<void> {
+  const client = supabase
+  if (!client) return
+  const when = new Date(tomb.updatedAt).toISOString()
+  const { error } = await client.from('tags').upsert(
+    { user_id: userId, id: tomb.id, name: '', color: 'yellow', created_at: when, updated_at: when, deleted_at: when },
+    { onConflict: 'user_id,id' },
+  )
+  if (error) throw error
+}
+
+async function mergeLabels(userId: string): Promise<void> {
+  const client = supabase
+  if (!client) return
+  const { data, error } = await client.from('book_labels').select('*').eq('user_id', userId)
+  if (error) throw error
+  const remote = (data ?? []) as RemoteLabel[]
+  const remoteById = new Map(remote.map((row) => [row.book_id, row]))
+  const books = await listBooks()
+
+  for (const book of books) {
+    const row = remoteById.get(book.id)
+    const stamp = book.classifyUpdatedAt ?? 0
+    if (!row) {
+      if (stamp > 0) await pushLabel(userId, book, stamp)
+      continue
+    }
+    if (stamp > ms(row.updated_at)) await pushLabel(userId, book, stamp)
+    else if (ms(row.updated_at) > stamp) {
+      await saveBook({
+        ...book,
+        folderId: row.folder_id,
+        tagIds: row.tag_ids ?? [],
+        year: row.year,
+        classifyUpdatedAt: ms(row.updated_at),
+      })
+    }
+  }
+
+  const folderIds = new Set((await listFolders()).map((folder) => folder.id))
+  const tagIds = new Set((await listTags()).map((tag) => tag.id))
+  for (const book of await listBooks()) {
+    const nextTags = (book.tagIds ?? []).filter((id) => tagIds.has(id))
+    const folderGone = Boolean(book.folderId) && !folderIds.has(book.folderId ?? '')
+    if (!folderGone && nextTags.length === (book.tagIds ?? []).length) continue
+    await saveBook({
+      ...book,
+      folderId: folderGone ? null : book.folderId,
+      tagIds: nextTags,
+      classifyUpdatedAt: Date.now(),
+    })
+  }
+}
+
+async function pushLabel(userId: string, book: Book, stamp: number): Promise<void> {
+  const client = supabase
+  if (!client) return
+  const { error } = await client.from('book_labels').upsert(
+    {
+      user_id: userId,
+      book_id: book.id,
+      folder_id: book.folderId ?? null,
+      tag_ids: book.tagIds ?? [],
+      year: book.year ?? null,
+      updated_at: new Date(stamp).toISOString(),
+    },
+    { onConflict: 'user_id,book_id' },
+  )
+  if (error) throw error
 }
 
 async function pushReading(userId: string, record: ReadingTimeRecord): Promise<void> {
