@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { isSingleEnglishWord } from '../lib/lookup'
 import type { HighlightColor } from '../lib/types'
 import { ColorSwatches } from './ColorSwatches'
@@ -14,6 +15,7 @@ type Props = {
 }
 
 export function SelectionToolbar({ selection, onHighlight, onUnderline, onComment, onLookup, onCancel }: Props) {
+  const { t } = useTranslation()
   // On touch screens the system's own copy/paste menu sits above the selection.
   const isTouch = window.matchMedia('(pointer: coarse)').matches
 
@@ -26,22 +28,22 @@ export function SelectionToolbar({ selection, onHighlight, onUnderline, onCommen
     >
       <div data-keep-panel>
         <span className="toolbar-group">
-          <span className="toolbar-label">高亮</span>
-          <ColorSwatches labelPrefix="高亮" onPick={onHighlight} />
+          <span className="toolbar-label">{t('toolbar.highlight')}</span>
+          <ColorSwatches labelPrefix={t('toolbar.highlight')} onPick={onHighlight} />
         </span>
         <span className="toolbar-divider" />
         <button type="button" className="toolbar-button" onClick={onUnderline}>
-          划线
+          {t('toolbar.underline')}
         </button>
         <button type="button" className="toolbar-button" onClick={onComment}>
-          评论
+          {t('toolbar.comment')}
         </button>
         <button type="button" className="toolbar-button" onClick={onLookup}>
-          {isSingleEnglishWord(selection.text) ? '查词' : '翻译'}
+          {isSingleEnglishWord(selection.text) ? t('toolbar.lookup') : t('toolbar.translate')}
         </button>
         <span className="toolbar-divider" />
         <button type="button" className="toolbar-button muted" onClick={onCancel}>
-          取消
+          {t('toolbar.cancel')}
         </button>
       </div>
     </Floating>

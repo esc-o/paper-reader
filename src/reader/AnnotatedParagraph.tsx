@@ -1,5 +1,6 @@
 import { memo, useMemo } from 'react'
 import type { CSSProperties, MouseEvent } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { Paragraph } from '../pdf/extractParagraphs'
 import type { Annotation } from '../lib/types'
 import { anchorFromPoint, anchorFromRect, hasTextSelection } from './selection'
@@ -8,6 +9,10 @@ import type { Anchor } from './selection'
 type Props = {
   paragraph: Paragraph
   annotations: Annotation[]
+  /** Inclusive start into `paragraph.text`. Omit to show the whole paragraph. */
+  start?: number
+  /** Exclusive end into `paragraph.text`. */
+  end?: number
   onMarksClick: (ids: string[], anchor: Anchor) => void
   onCommentClick: (id: string, anchor: Anchor) => void
 }
@@ -21,16 +26,19 @@ type Segment = {
   commentsEndingHere: Annotation[]
 }
 
-function buildSegments(paragraph: Paragraph, annotations: Annotation[]): Segment[] {
+function buildSegments(paragraph: Paragraph, annotations: Annotation[], from: number, to: number): Segment[] {
   const { id, text } = paragraph
   const local = annotations.flatMap((a) =>
     a.ranges
       .filter((r) => r.paragraphId === id)
-      .map((r) => ({ annotation: a, start: Math.max(0, r.start), end: Math.min(text.length, r.end) })),
+      .flatMap((r) => {
+        const start = Math.max(from, r.start)
+        const end = Math.min(to, r.end)
+        if (end <= start) return []
+        return [{ annotation: a, start, end }]
+      }),
   )
-  const points = [...new Set([0, text.length, ...local.flatMap((l) => [l.start, l.end])])].sort(
-    (a, b) => a - b,
-  )
+  const points = [...new Set([from, to, ...local.flatMap((l) => [l.start, l.end])])].sort((a, b) => a - b)
 
   const segments: Segment[] = []
   for (let i = 0; i < points.length - 1; i++) {
@@ -43,7 +51,9 @@ function buildSegments(paragraph: Paragraph, annotations: Annotation[]): Segment
       .sort((a, b) => a.createdAt - b.createdAt)
     const commentsEndingHere = annotations.filter((a) => {
       const last = a.ranges.at(-1)
-      return a.kind === 'comment' && last?.paragraphId === id && Math.min(text.length, last.end) === end
+      if (a.kind !== 'comment' || last?.paragraphId !== id) return false
+      const originalEnd = Math.min(text.length, last.end)
+      return originalEnd === end && originalEnd > from && originalEnd <= to
     })
     segments.push({ start, end, covering, commentsEndingHere })
   }
@@ -63,10 +73,17 @@ function segmentStyle(covering: Annotation[]): CSSProperties {
 export const AnnotatedParagraph = memo(function AnnotatedParagraph({
   paragraph,
   annotations,
+  start = 0,
+  end,
   onMarksClick,
   onCommentClick,
 }: Props) {
-  const segments = useMemo(() => buildSegments(paragraph, annotations), [paragraph, annotations])
+  const to = end ?? paragraph.text.length
+  const segments = useMemo(
+    () => buildSegments(paragraph, annotations, start, to),
+    [paragraph, annotations, start, to],
+  )
+  const { t } = useTranslation()
   const Text = paragraph.isHeading ? 'h3' : 'p'
 
   function handleMarkClick(event: MouseEvent, covering: Annotation[]) {
@@ -79,7 +96,7 @@ export const AnnotatedParagraph = memo(function AnnotatedParagraph({
 
   return (
     <div className={`paragraph${paragraph.isHeading ? ' heading' : ''}`}>
-      <Text className="paragraph-text" data-paragraph-id={paragraph.id}>
+      <Text className="paragraph-text" data-paragraph-id={paragraph.id} data-char-offset={start}>
         {segments.map((segment) => {
           const text = paragraph.text.slice(segment.start, segment.end)
           const { covering } = segment
@@ -91,6 +108,17 @@ export const AnnotatedParagraph = memo(function AnnotatedParagraph({
                 <span
                   className={`mark${covering.some((a) => a.kind === 'comment') ? ' commented' : ''}`}
                   style={segmentStyle(covering)}
+                  data-mark-ids={
+                    covering.some((a) => a.kind !== 'comment')
+                      ? covering
+                          .filter((a) => a.kind !== 'comment')
+                          .map((a) => a.id)
+                          .join(' ')
+                      : undefined
+                  }
+                  data-comment-id={
+                    covering.some((a) => a.kind !== 'comment') ? undefined : covering[0]?.id
+                  }
                   onClick={(e) => handleMarkClick(e, covering)}
                 >
                   {text}
@@ -101,7 +129,8 @@ export const AnnotatedParagraph = memo(function AnnotatedParagraph({
                   key={comment.id}
                   type="button"
                   className="comment-bubble"
-                  aria-label="查看评论"
+                  data-comment-id={comment.id}
+                  aria-label={t('comment.view')}
                   onClick={(e) => onCommentClick(comment.id, anchorFromRect(e.currentTarget.getBoundingClientRect()))}
                 >
                   <svg viewBox="0 0 16 16" aria-hidden="true">

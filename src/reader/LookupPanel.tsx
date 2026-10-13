@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { TouchEvent } from 'react'
 import { createPortal } from 'react-dom'
+import { useTranslation } from 'react-i18next'
 import { isSingleEnglishWord, lookup, LookupError } from '../lib/lookup'
 import type { LookupResult } from '../lib/lookup'
 
@@ -19,6 +20,7 @@ export function LookupPanel({ text, onClose }: { text: string; onClose: () => vo
   const panelRef = useRef<HTMLElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
   const dragStart = useRef<number | null>(null)
+  const { t } = useTranslation()
 
   useEffect(() => {
     const controller = new AbortController()
@@ -27,11 +29,11 @@ export function LookupPanel({ text, onClose }: { text: string; onClose: () => vo
       .catch((error) => {
         if (controller.signal.aborted) return
         console.error(error)
-        const message = error instanceof LookupError ? error.message : '查询失败，请稍后再试。'
+        const message = error instanceof LookupError ? error.message : t('lookup.failed')
         setState({ kind: 'error', message })
       })
     return () => controller.abort()
-  }, [text])
+  }, [text, t])
 
   useEffect(() => {
     const onPointerDown = (e: PointerEvent) => {
@@ -78,20 +80,20 @@ export function LookupPanel({ text, onClose }: { text: string; onClose: () => vo
       ref={panelRef}
       className={`lookup-panel${drag > 0 ? ' dragging' : ''}`}
       style={drag > 0 ? { transform: `translateY(${drag}px)` } : undefined}
-      aria-label={shownAsDictionary ? '查词' : '翻译'}
+      aria-label={shownAsDictionary ? t('toolbar.lookup') : t('toolbar.translate')}
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
     >
       <div className="sheet-handle" />
       <header className="lookup-header">
-        <span className="card-label">{shownAsDictionary ? '查词 · DICTIONARY' : '翻译 · TRANSLATE'}</span>
-        <button type="button" className="icon-button" aria-label="关闭" onClick={onClose}>
+        <span className="card-label">{shownAsDictionary ? t('lookup.dictionary') : t('lookup.translate')}</span>
+        <button type="button" className="icon-button" aria-label={t('lookup.close')} onClick={onClose}>
           ✕
         </button>
       </header>
       <div className="lookup-body" ref={bodyRef}>
-        {state.kind === 'loading' && <p className="lookup-note">正在查询…</p>}
+        {state.kind === 'loading' && <p className="lookup-note">{t('lookup.loading')}</p>}
         {state.kind === 'error' && <p className="lookup-note error">{state.message}</p>}
         {state.kind === 'done' && <LookupContent result={state.result} />}
       </div>
@@ -101,14 +103,15 @@ export function LookupPanel({ text, onClose }: { text: string; onClose: () => vo
 }
 
 function LookupContent({ result }: { result: LookupResult }) {
+  const { t } = useTranslation()
   if (result.kind === 'translation') {
     return (
       <>
         {result.notice && <p className="lookup-note">{result.notice}</p>}
         <p className="lookup-original">{result.source}</p>
         <p className="lookup-translation">{result.translated}</p>
-        {result.truncated && <p className="lookup-note">选中的文字太长，只翻译了前一部分。</p>}
-        <p className="lookup-source">翻译来自 MyMemory</p>
+        {result.truncated && <p className="lookup-note">{t('lookup.tooLong')}</p>}
+        <p className="lookup-source">{t('lookup.fromMemory')}</p>
       </>
     )
   }
@@ -126,7 +129,7 @@ function LookupContent({ result }: { result: LookupResult }) {
                 <button
                   type="button"
                   className="icon-button small"
-                  aria-label={`播放发音 ${p.text}`}
+                  aria-label={t('lookup.play', { text: p.text })}
                   onClick={() => new Audio(p.audio).play()}
                 >
                   ▶
@@ -149,7 +152,7 @@ function LookupContent({ result }: { result: LookupResult }) {
           </ol>
         </section>
       ))}
-      <p className="lookup-source">释义来自 {entry.source}</p>
+      <p className="lookup-source">{t('lookup.fromSource', { source: entry.source })}</p>
     </>
   )
 }

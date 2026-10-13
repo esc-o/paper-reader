@@ -4,6 +4,9 @@
 }
 
 .shelf-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
   padding: 16px 24px;
   font-size: 14px;
 }

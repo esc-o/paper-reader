@@ -1,3 +1,5 @@
+import i18n from '../i18n'
+
 export type DictionaryEntry = {
   word: string
   source: string
@@ -93,10 +95,10 @@ export async function lookup(text: string, signal: AbortSignal): Promise<LookupR
   try {
     const entry = await lookupDictionary(word, signal)
     if (entry) return { kind: 'dictionary', entry }
-    return { ...(await translate(word, signal)), notice: '词典里没有这个词，下面是翻译结果。' }
+    return { ...(await translate(word, signal)), notice: i18n.t('lookup.missingDict') }
   } catch (error) {
     if (signal.aborted || !(error instanceof LookupError)) throw error
-    return { ...(await translate(word, signal)), notice: '两个词典都没有回应，下面是翻译结果。' }
+    return { ...(await translate(word, signal)), notice: i18n.t('lookup.bothDown') }
   }
 }
 
@@ -120,7 +122,7 @@ async function lookupDictionary(word: string, signal: AbortSignal): Promise<Dict
     writeCache(word, null)
     return null
   }
-  throw new LookupError('词典没有回应')
+  throw new LookupError(i18n.t('lookup.dictDown'))
 }
 
 async function request(url: string, signal: AbortSignal, timeoutMs: number): Promise<Response | null> {
@@ -219,8 +221,8 @@ async function translate(
 
   const params = new URLSearchParams({ q: query, langpair: 'en|zh-CN' })
   const res = await request(`https://api.mymemory.translated.net/get?${params}`, signal, FALLBACK_TIMEOUT_MS)
-  if (!res) throw new LookupError('连不上翻译服务，请检查网络。')
-  if (!res.ok) throw new LookupError(`翻译服务出错了（${res.status}），请稍后再试。`)
+  if (!res) throw new LookupError(i18n.t('lookup.offline'))
+  if (!res.ok) throw new LookupError(i18n.t('lookup.translateStatus', { status: res.status }))
 
   const data = (await res.json()) as {
     responseStatus: number | string
@@ -228,10 +230,10 @@ async function translate(
     responseData?: { translatedText?: string }
   }
   const status = Number(data.responseStatus)
-  if (status === 429) throw new LookupError('今天的免费翻译额度用完了，明天再试吧。')
+  if (status === 429) throw new LookupError(i18n.t('lookup.quota'))
   const translated = data.responseData?.translatedText
   if (status !== 200 || !translated) {
-    throw new LookupError(data.responseDetails || '翻译失败，请稍后再试。')
+    throw new LookupError(data.responseDetails || i18n.t('lookup.translateFailed'))
   }
 
   const decoded = new DOMParser().parseFromString(translated, 'text/html').documentElement.textContent

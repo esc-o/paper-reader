@@ -1,14 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, MouseEvent as ReactMouseEvent } from 'react'
+import { useTranslation } from 'react-i18next'
+import { TopActions } from '../components/TopActions'
+import { LIBRARY_EVENT } from '../lib/changes'
 import { deleteAnnotation, getBook, listAnnotations, saveAnnotation, saveBook, saveProgress } from '../lib/db'
-import { prepareBook } from '../lib/library'
+import { familyFor, useFonts } from '../lib/fonts'
+import { importPdf, prepareBook } from '../lib/library'
 import { routes } from '../lib/router'
 import { useStoredSettings } from '../lib/settings'
 import { displayPage } from '../lib/toc'
 import type { Annotation, Book, HighlightColor } from '../lib/types'
+import { useNarrow } from '../lib/useNarrow'
 import { useReadingTimer } from '../lib/useReadingTimer'
 import { AnnotatedParagraph } from '../reader/AnnotatedParagraph'
 import { CommentPopover, MarksPopover, NewCommentPopover } from '../reader/AnnotationPopovers'
+import { CurlBook } from '../reader/CurlBook'
+import type { CurlHandle } from '../reader/CurlBook'
 import { ExportDialog } from '../reader/ExportDialog'
 import { LookupPanel } from '../reader/LookupPanel'
 import { ReaderMenu, ReadingFab } from '../reader/ReaderMenu'
@@ -35,9 +42,17 @@ export function ReaderPage({ bookId }: { bookId: string }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
   const [settings, updateSettings] = useStoredSettings()
+  const { t } = useTranslation()
+  const narrow = useNarrow()
+  const { fonts } = useFonts()
+  const fontFamily = familyFor(fonts, settings.fontId)
+  const curl = settings.pageMode === 'flip' && narrow
   const contentRef = useRef<HTMLDivElement>(null)
+  const curlRef = useRef<CurlHandle>(null)
   const pageRef = useRef(page)
   const menuOpenRef = useRef(menuOpen)
+  const [reimportError, setReimportError] = useState<string | null>(null)
+  const [reimporting, setReimporting] = useState(false)
   useEffect(() => {
     pageRef.current = page
     menuOpenRef.current = menuOpen
@@ -68,10 +83,48 @@ export function ReaderPage({ bookId }: { bookId: string }) {
     }
   }, [bookId])
 
+  useEffect(() => {
+    const refresh = async () => {
+      const [found, saved] = await Promise.all([getBook(bookId), listAnnotations(bookId)])
+      setAnnotations(saved)
+      if (!found) return
+      setBook((prev) => {
+        if (!prev) return prepareBook(found).book
+        if (prev.needsFile && found.paragraphs.length > 0) return prepareBook(found).book
+        if (prev.paragraphs.length > 0 && found.paragraphs.length === 0) {
+          return { ...prev, currentPage: found.currentPage, lastReadAt: found.lastReadAt, updatedAt: found.updatedAt }
+        }
+        if (prev.updatedAt === found.updatedAt && prev.currentPage === found.currentPage) return prev
+        return { ...prev, ...prepareBook(found).book, paragraphs: prev.paragraphs.length > 0 ? prev.paragraphs : found.paragraphs }
+      })
+      if (found.currentPage !== pageRef.current && (found.updatedAt ?? 0) > 0) {
+        pageRef.current = found.currentPage
+        setPage(found.currentPage)
+        curlRef.current?.jumpToPdf(found.currentPage)
+      }
+    }
+    window.addEventListener(LIBRARY_EVENT, refresh)
+    return () => window.removeEventListener(LIBRARY_EVENT, refresh)
+  }, [bookId])
+
+  const onCurlPage = useCallback((pdfPage: number) => {
+    if (!book || pdfPage === pageRef.current) return
+    pageRef.current = pdfPage
+    setPage(pdfPage)
+    saveProgress(book.id, pdfPage)
+  }, [book])
+
   const goToPage = useCallback(
     (target: number) => {
       if (!book) return
       const next = Math.min(Math.max(1, target), book.numPages)
+      if (curlRef.current) {
+        clearBrowserSelection()
+        setSelection(null)
+        setPopover(null)
+        curlRef.current.jumpToPdf(next)
+        return
+      }
       if (next === page) return
       clearBrowserSelection()
       setSelection(null)
@@ -96,8 +149,14 @@ export function ReaderPage({ bookId }: { bookId: string }) {
         if (event.key === 'Escape') setMenuOpen(false)
         return
       }
-      if (event.key === 'ArrowRight') goToPage(page + 1)
-      if (event.key === 'ArrowLeft') goToPage(page - 1)
+      if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+        if (curlRef.current) {
+          curlRef.current.flip(event.key === 'ArrowRight' ? 1 : -1)
+          return
+        }
+        if (event.key === 'ArrowRight') goToPage(page + 1)
+        if (event.key === 'ArrowLeft') goToPage(page - 1)
+      }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
@@ -105,7 +164,7 @@ export function ReaderPage({ bookId }: { bookId: string }) {
 
   useEffect(() => {
     const el = contentRef.current
-    if (!el || settings.pageMode !== 'flip') return
+    if (!el || settings.pageMode !== 'flip' || narrow) return
     let startX = 0
     let startY = 0
     const onStart = (event: TouchEvent) => {
@@ -124,7 +183,7 @@ export function ReaderPage({ bookId }: { bookId: string }) {
       el.removeEventListener('touchstart', onStart)
       el.removeEventListener('touchend', onEnd)
     }
-  }, [goToPage, settings.pageMode])
+  }, [goToPage, narrow, settings.pageMode])
 
   useEffect(() => {
     if (!book || settings.pageMode !== 'scroll') return
@@ -272,14 +331,38 @@ export function ReaderPage({ bookId }: { bookId: string }) {
   const closeLookup = useCallback(() => setLookupText(null), [])
   const closeMenu = useCallback(() => setMenuOpen(false), [])
 
+  async function reimportFile(file: File) {
+    setReimporting(true)
+    setReimportError(null)
+    try {
+      const id = await importPdf(file)
+      if (id !== bookId) {
+        window.location.hash = routes.reader(id)
+        return
+      }
+      const found = await getBook(bookId)
+      if (!found) return
+      const prepared = prepareBook(found)
+      if (prepared.changed) await saveBook(prepared.book)
+      setBook(prepared.book)
+      setPage(prepared.book.currentPage)
+      setAnnotations(await listAnnotations(bookId))
+    } catch (error) {
+      console.error(error)
+      setReimportError(error instanceof Error ? error.message : t('reader.importFailed'))
+    } finally {
+      setReimporting(false)
+    }
+  }
+
   if (book === undefined) {
-    return <div className="reader"><p className="reader-message">正在打开…</p></div>
+    return <div className="reader"><p className="reader-message">{t('reader.opening')}</p></div>
   }
   if (book === null) {
     return (
       <div className="reader">
         <p className="reader-message">
-          没找到这篇文献，可能已经被删除了。<a href={routes.shelf}>回到书架</a>
+          {t('reader.missing')} <a href={routes.shelf}>{t('nav.backShelf')}</a>
         </p>
       </div>
     )
@@ -288,45 +371,82 @@ export function ReaderPage({ bookId }: { bookId: string }) {
   const popoverMarks = popover?.kind === 'marks' ? annotations.filter((annotation) => popover.ids.includes(annotation.id)) : []
   const popoverComment = popover?.kind === 'comment' ? annotations.find((annotation) => annotation.id === popover.id) : undefined
   const pages = settings.pageMode === 'scroll' ? Array.from({ length: book.numPages }, (_, index) => index + 1) : [page]
+  const typeface = fontFamily ? `'${fontFamily}', sans-serif` : undefined
 
   return (
     <div
-      className={`reader theme-${settings.theme} mode-${settings.pageMode}${lookupText ? ' with-panel' : ''}`}
+      className={`reader theme-${settings.theme} mode-${settings.pageMode}${curl ? ' curl' : ''}${lookupText ? ' with-panel' : ''}`}
       style={{
         '--reader-font': `${settings.fontSize}px`,
         '--reader-leading': String(settings.lineHeight),
         '--reader-margin': `${settings.margin}px`,
+        '--reader-typeface': typeface,
       } as CSSProperties}
       onClick={onReaderClick}
     >
       <header className="reader-bar">
-        <a className="reader-back" href={routes.home}>← 首页</a>
+        <a className="reader-back" href={routes.home}>{t('nav.backHome')}</a>
         <span className="reader-title" title={book.title}>{book.title}</span>
         <span className="reader-page-count">{page} / {book.numPages}</span>
+        <TopActions />
       </header>
 
       <div className="reader-content" ref={contentRef}>
-        {pages.map((pageNumber) => (
-          <PageSection
-            key={pageNumber}
-            book={book}
-            pageNumber={pageNumber}
-            turn={turn}
-            annotationsByParagraph={annotationsByParagraph}
+        {book.needsFile ? (
+          <div className="reimport">
+            <p>{t('reader.reimport')}</p>
+            <label className="solid-button reimport-button">
+              {reimporting ? t('errors.opening') : t('reader.reimportButton')}
+              <input
+                type="file"
+                accept="application/pdf,.pdf"
+                hidden
+                onChange={(event) => {
+                  const file = event.target.files?.[0]
+                  if (file) void reimportFile(file)
+                  event.target.value = ''
+                }}
+              />
+            </label>
+            {reimportError && <p className="reimport-error">{reimportError}</p>}
+          </div>
+        ) : curl ? (
+          <CurlBook
+            ref={curlRef}
+            paragraphs={book.paragraphs}
+            pdfPage={page}
+            margin={settings.margin}
+            fontSize={settings.fontSize}
+            lineHeight={settings.lineHeight}
+            fontFamily={fontFamily}
+            annotations={annotations}
             onMarksClick={openMarks}
             onCommentClick={openComment}
+            onPdfPage={onCurlPage}
           />
-        ))}
+        ) : (
+          pages.map((pageNumber) => (
+            <PageSection
+              key={pageNumber}
+              book={book}
+              pageNumber={pageNumber}
+              turn={turn}
+              annotationsByParagraph={annotationsByParagraph}
+              onMarksClick={openMarks}
+              onCommentClick={openComment}
+            />
+          ))
+        )}
       </div>
 
-      {settings.pageMode === 'flip' && (
+      {settings.pageMode === 'flip' && !curl && !book.needsFile && (
         <nav className="pager">
           <button type="button" className="pager-button" disabled={page <= 1} onClick={() => goToPage(page - 1)}>
-            ← 上一页
+            {t('reader.prev')}
           </button>
-          <span className="pager-count">第 {page} / {book.numPages} 页</span>
+          <span className="pager-count">{t('reader.pager', { page, total: book.numPages })}</span>
           <button type="button" className="pager-button" disabled={page >= book.numPages} onClick={() => goToPage(page + 1)}>
-            下一页 →
+            {t('reader.next')}
           </button>
         </nav>
       )}
@@ -426,6 +546,7 @@ function PageSection({
   onMarksClick: (ids: string[], anchor: Anchor) => void
   onCommentClick: (id: string, anchor: Anchor) => void
 }) {
+  const { t } = useTranslation()
   const onPage = book.paragraphs.filter((paragraph) => paragraph.startPage === pageNumber)
   const visible = onPage.filter((paragraph) => !paragraph.isToc)
   const bookPage = displayPage(pageNumber, book.pageOffset ?? 0)
@@ -435,7 +556,7 @@ function PageSection({
       <div className="page-sep">— {bookPage} —</div>
       {visible.length === 0 && (
         <p className="reader-message">
-          {onPage.length > 0 ? '这一页是目录，已收起。可以在菜单里查看。' : '这一页没有可提取的文字（可能是图表页）。'}
+          {onPage.length > 0 ? t('reader.tocHidden') : t('reader.noText')}
         </p>
       )}
       {visible.map((paragraph) => (

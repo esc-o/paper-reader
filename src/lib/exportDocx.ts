@@ -8,6 +8,7 @@ import {
   UnderlineType,
 } from 'docx'
 import type { Paragraph } from '../pdf/extractParagraphs'
+import i18n from '../i18n'
 import { prepareBook } from './library'
 import { displayPage } from './toc'
 import type { Annotation, Book, HighlightColor } from './types'
@@ -44,7 +45,7 @@ type NoteEntry = {
 export async function exportNotes(book: Book, annotations: Annotation[], options: ExportOptions): Promise<void> {
   const prepared = prepareBook(book).book
   const notes = collectNotes(prepared, annotations, options)
-  if (notes.length === 0) throw new ExportError('没有符合条件的标注。')
+  if (notes.length === 0) throw new ExportError(i18n.t('export.none'))
 
   const children: DocxParagraph[] = [
     new DocxParagraph({
@@ -90,7 +91,7 @@ export async function exportNotes(book: Book, annotations: Annotation[], options
       children.push(
         new DocxParagraph({
           spacing: { after: last ? 200 : 40 },
-          children: [run(`　评：${comment}`)],
+          children: [run(i18n.t('export.commentPrefix', { comment }))],
         }),
       )
     })
@@ -120,7 +121,8 @@ function collectNotes(book: Book, annotations: Annotation[], options: ExportOpti
     notes.push({
       pdfPage: paragraph.startPage,
       paragraphId: paragraph.id,
-      pageLabel: start === end ? `p. ${start}` : `p. ${start}–${end}`,
+      pageLabel:
+        start === end ? i18n.t('export.page', { page: start }) : i18n.t('export.pageRange', { start, end }),
       chapter: chapterAt(book, paragraph),
       runs,
       comments: group.flatMap((annotation) =>
@@ -217,7 +219,11 @@ function run(
 }
 
 function formatDate(date: Date): string {
-  return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`
+  return i18n.t('export.date', {
+    year: date.getFullYear(),
+    month: date.getMonth() + 1,
+    day: date.getDate(),
+  })
 }
 
 function fileName(title: string): string {

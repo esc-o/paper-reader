@@ -11,11 +11,15 @@
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.3.0",
+    "@supabase/supabase-js": "^2.117.3",
     "docx": "^9.10.0",
+    "i18next": "^26.4.4",
     "idb": "^8.0.4",
+    "page-flip": "^2.0.7",
     "pdfjs-dist": "^6.4.299",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "react-i18next": "^17.0.16"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",

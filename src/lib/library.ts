@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import i18n from '../i18n'
 import { extractPdf, ExtractionError } from '../pdf/extractParagraphs'
 import type { Paragraph } from '../pdf/extractParagraphs'
 import { getBook, saveBook } from './db'
@@ -15,27 +16,31 @@ export async function importPdf(
   file: File,
   onProgress?: (page: number, total: number) => void,
 ): Promise<string> {
-  if (!isPdfFile(file)) throw new ExtractionError('请选择 PDF 文件。')
+  if (!isPdfFile(file)) throw new ExtractionError(i18n.t('errors.notPdf'))
 
   const buffer = await file.arrayBuffer()
   // Hash before parsing: PDF.js transfers the buffer to its worker and detaches it.
   const id = await sha256(buffer)
-  if (await getBook(id)) return id
+  const existing = await getBook(id)
+  if (existing && !existing.needsFile && existing.paragraphs.length > 0) return id
 
   const pdf = await extractPdf(new Uint8Array(buffer), onProgress)
+  const now = Date.now()
   await saveBook({
     id,
     fileName: file.name,
     title: pdf.title || file.name.replace(/\.pdf$/i, ''),
     author: pdf.author,
-    description: findDescription(pdf.paragraphs),
+    description: existing?.description || findDescription(pdf.paragraphs),
     numPages: pdf.numPages,
     paragraphs: pdf.paragraphs,
     toc: pdf.toc,
     pageOffset: pdf.pageOffset,
-    addedAt: Date.now(),
-    lastReadAt: null,
-    currentPage: 1,
+    addedAt: existing?.addedAt ?? now,
+    lastReadAt: existing?.lastReadAt ?? null,
+    currentPage: existing && existing.currentPage <= pdf.numPages ? existing.currentPage : 1,
+    needsFile: false,
+    updatedAt: existing?.updatedAt ?? now,
   })
   return id
 }
@@ -119,8 +124,7 @@ export function useImportPdf() {
       window.location.hash = routes.reader(id)
     } catch (error) {
       console.error(error)
-      const message =
-        error instanceof ExtractionError ? error.message : '读取 PDF 时出错了，请换一个文件试试。'
+      const message = error instanceof ExtractionError ? error.message : i18n.t('errors.readFailed')
       setState({ kind: 'error', message })
     }
   }
@@ -131,7 +135,7 @@ export function useImportPdf() {
 export function importStatusText(state: ImportState): string | null {
   if (state.kind === 'error') return state.message
   if (state.kind === 'loading') {
-    return state.total > 0 ? `正在读取第 ${state.page} / ${state.total} 页…` : '正在打开 PDF…'
+    return state.total > 0 ? i18n.t('errors.readingPage', { page: state.page, total: state.total }) : i18n.t('errors.opening')
   }
   return null
 }

@@ -46,6 +46,65 @@
   padding: 32px var(--reader-margin, 24px) 8px;
 }
 
+.reader.curl {
+  height: 100svh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.reader.curl .reader-bar {
+  flex: none;
+}
+
+.reader.curl .reader-content {
+  flex: 1;
+  min-height: 0;
+  max-width: none;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  position: relative;
+}
+
+.curl-host,
+.curl-book {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.curl-page {
+  box-sizing: border-box;
+  padding: 16px var(--reader-margin, 28px) 24px;
+  overflow: hidden;
+  background: var(--reader-bg, var(--cream));
+  color: var(--reader-text, var(--ink));
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.reimport {
+  max-width: 460px;
+  margin: 48px auto;
+  padding: 0 24px;
+}
+
+.reimport-button {
+  display: inline-block;
+  margin-top: 16px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: var(--reader-text, var(--ink));
+  color: var(--reader-bg, var(--cream));
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.reimport-error {
+  color: #c92a2a;
+}
+
 .mode-scroll .reader-content {
   padding-bottom: 30vh;
 }
@@ -98,6 +157,7 @@
 
 .paragraph-text {
   margin: 0;
+  font-family: var(--reader-typeface, inherit);
   font-size: var(--reader-font, 17px);
   line-height: var(--reader-leading, 1.75);
   overflow-wrap: anywhere;

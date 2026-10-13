@@ -1,11 +1,18 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import '@fontsource-variable/inter'
+import './i18n'
 import './index.css'
 import App from './App.tsx'
+import { AuthProvider } from './lib/auth'
+import { FontsProvider } from './lib/fonts'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <AuthProvider>
+      <FontsProvider>
+        <App />
+      </FontsProvider>
+    </AuthProvider>
   </StrictMode>,
 )

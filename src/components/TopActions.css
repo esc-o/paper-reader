@@ -1,0 +1,97 @@
+.top-actions {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.lang-toggle {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.lang-toggle button {
+  padding: 2px 4px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  opacity: 0.45;
+  font: inherit;
+  cursor: pointer;
+}
+
+.lang-toggle button.on {
+  opacity: 1;
+}
+
+.login-button {
+  max-width: 46vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 6px 12px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.account-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 30;
+  min-width: 140px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--cream);
+  color: var(--ink);
+  box-shadow: 0 12px 32px rgba(43, 34, 32, 0.16);
+}
+
+.account-menu button {
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.account-menu button:hover {
+  background: rgba(43, 34, 32, 0.06);
+}
+
+.auth-error {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 30;
+  width: min(280px, 70vw);
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 13px;
+  line-height: 1.4;
+  box-shadow: 0 12px 32px rgba(43, 34, 32, 0.16);
+}
+
+.tone-light .account-menu,
+.tone-light .auth-error {
+  color: var(--ink);
+}

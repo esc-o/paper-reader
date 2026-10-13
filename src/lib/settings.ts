@@ -1,4 +1,5 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { notifyLocalChange } from './changes'
 
 export type ReaderTheme = 'day' | 'sepia' | 'night'
 export type PageMode = 'scroll' | 'flip'
@@ -11,11 +12,16 @@ export type ReaderSettings = {
   margin: number
   theme: ReaderTheme
   pageMode: PageMode
+  /** Uploaded font id. Null keeps the interface typeface for the body too. */
+  fontId: string | null
+  /** When a synced field last changed. 0 means this device has not changed them yet. */
+  updatedAt: number
   /** Null until the reader drags the button; then it stays where they left it. */
   fab: FabPosition | null
 }
 
 const KEY = 'paper-reader.settings'
+const EVENT = 'paper-reader-settings'
 
 export const DEFAULT_SETTINGS: ReaderSettings = {
   fontSize: 17,
@@ -23,8 +29,12 @@ export const DEFAULT_SETTINGS: ReaderSettings = {
   margin: 28,
   theme: 'day',
   pageMode: 'flip',
+  fontId: null,
+  updatedAt: 0,
   fab: null,
 }
+
+const SYNC_KEYS = ['fontSize', 'lineHeight', 'margin', 'theme', 'pageMode', 'fontId'] as const
 
 function clamp(value: number, min: number, max: number, fallback: number): number {
   return Number.isFinite(value) ? Math.min(Math.max(value, min), max) : fallback
@@ -45,6 +55,8 @@ export function loadSettings(): ReaderSettings {
       margin: clamp(parsed.margin ?? DEFAULT_SETTINGS.margin, 12, 80, DEFAULT_SETTINGS.margin),
       theme,
       pageMode,
+      fontId: typeof parsed.fontId === 'string' && parsed.fontId ? parsed.fontId : null,
+      updatedAt: Number.isFinite(parsed.updatedAt) ? (parsed.updatedAt as number) : 0,
       fab,
     }
   } catch {
@@ -54,16 +66,40 @@ export function loadSettings(): ReaderSettings {
 
 export function saveSettings(settings: ReaderSettings): void {
   localStorage.setItem(KEY, JSON.stringify(settings))
+  window.dispatchEvent(new Event(EVENT))
+}
+
+/** Fields that follow the reader from device to device. The button position stays local. */
+export function syncedSettings(settings: ReaderSettings) {
+  return {
+    fontSize: settings.fontSize,
+    lineHeight: settings.lineHeight,
+    margin: settings.margin,
+    theme: settings.theme,
+    pageMode: settings.pageMode,
+    fontId: settings.fontId,
+    updatedAt: settings.updatedAt,
+  }
 }
 
 export function useStoredSettings(): [ReaderSettings, (patch: Partial<ReaderSettings>) => void] {
   const [settings, setSettings] = useState(loadSettings)
-  const update = useCallback((patch: Partial<ReaderSettings>) => {
-    setSettings((prev) => {
-      const next = { ...prev, ...patch }
-      saveSettings(next)
-      return next
-    })
+
+  useEffect(() => {
+    const reload = () => setSettings(loadSettings())
+    window.addEventListener(EVENT, reload)
+    return () => window.removeEventListener(EVENT, reload)
   }, [])
+
+  const update = useCallback((patch: Partial<ReaderSettings>) => {
+    const prev = loadSettings()
+    const next = { ...prev, ...patch }
+    const touched = SYNC_KEYS.some((key) => key in patch && patch[key] !== prev[key])
+    if (touched) next.updatedAt = Date.now()
+    saveSettings(next)
+    setSettings(next)
+    if (touched) notifyLocalChange()
+  }, [])
+
   return [settings, update]
 }

@@ -1,7 +1,9 @@
 import { useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import './DropZone.css'
 
 export function DropZone({ onFile }: { onFile: (file: File) => void }) {
+  const { t } = useTranslation()
   const [isDragging, setIsDragging] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -26,8 +28,8 @@ export function DropZone({ onFile }: { onFile: (file: File) => void }) {
         if (file) onFile(file)
       }}
     >
-      <p className="dropzone-title">把 PDF 拖到这里，或者点击选择文件</p>
-      <p className="dropzone-hint">文件只保存在这台电脑的浏览器里</p>
+      <p className="dropzone-title">{t('drop.title')}</p>
+      <p className="dropzone-hint">{t('drop.hint')}</p>
       <input
         ref={inputRef}
         type="file"

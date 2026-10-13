@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import { createPortal } from 'react-dom'
+import { useTranslation } from 'react-i18next'
+import { useFonts } from '../lib/fonts'
 import type { ReaderSettings, ReaderTheme } from '../lib/settings'
 import { displayPage } from '../lib/toc'
 import type { TocEntry } from '../lib/toc'
@@ -39,6 +41,7 @@ export function ReadingFab({
   onPosition: (position: { x: number; y: number }) => void
   onToggle: () => void
 }) {
+  const { t } = useTranslation()
   const [pos, setPos] = useState(() => position ?? defaultFab())
   const posRef = useRef(pos)
   const drag = useRef<{ dx: number; dy: number; x: number; y: number; moved: boolean } | null>(null)
@@ -91,7 +94,7 @@ export function ReadingFab({
       type="button"
       className={`reading-fab${open ? ' open' : ''}`}
       style={{ left: pos.x, top: pos.y }}
-      aria-label={open ? '关闭阅读菜单' : '打开阅读菜单'}
+      aria-label={open ? t('menu.close') : t('menu.open')}
       aria-expanded={open}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
@@ -132,11 +135,7 @@ function tocItems(book: Book): TocItem[] {
     }))
 }
 
-const THEMES: { id: ReaderTheme; label: string }[] = [
-  { id: 'day', label: '日间' },
-  { id: 'sepia', label: '护眼' },
-  { id: 'night', label: '夜间' },
-]
+const THEME_IDS: ReaderTheme[] = ['day', 'sepia', 'night']
 
 export function ReaderMenu({
   book,
@@ -155,6 +154,10 @@ export function ReaderMenu({
   onExport: () => void
   onClose: () => void
 }) {
+  const { t } = useTranslation()
+  const { fonts, addFont, removeFont } = useFonts()
+  const fontInput = useRef<HTMLInputElement>(null)
+  const [fontError, setFontError] = useState<string | null>(null)
   const items = tocItems(book)
   const current = items.reduce((found, item) => (item.pdfPage <= page ? item : found), undefined as TocItem | undefined)
   const usingHeadings = (book.toc ?? []).length === 0
@@ -170,24 +173,24 @@ export function ReaderMenu({
   return createPortal(
     <div className={`menu-layer theme-${settings.theme}`}>
       <div className="menu-scrim" onMouseDown={onClose} />
-      <aside className="reader-menu" role="dialog" aria-label="阅读菜单" onMouseDown={(event) => event.stopPropagation()}>
+      <aside className="reader-menu" role="dialog" aria-label={t('menu.label')} onMouseDown={(event) => event.stopPropagation()}>
         <div className="sheet-handle" />
         <header className="menu-header">
           <button type="button" className="menu-export" onClick={onExport}>
-            导出笔记
+            {t('menu.export')}
           </button>
-          <button type="button" className="icon-button" aria-label="关闭" onClick={onClose}>
+          <button type="button" className="icon-button" aria-label={t('menu.closeButton')} onClick={onClose}>
             ✕
           </button>
         </header>
         <div className="menu-body">
           <section className="menu-section">
-            <h2 className="card-label">目录</h2>
+            <h2 className="card-label">{t('menu.toc')}</h2>
             {items.length === 0 ? (
-              <p className="menu-empty">没有识别到目录。</p>
+              <p className="menu-empty">{t('menu.noToc')}</p>
             ) : (
               <>
-                {usingHeadings && <p className="menu-note">这篇没有目录页，下面是正文里的标题。</p>}
+                {usingHeadings && <p className="menu-note">{t('menu.headingsNote')}</p>}
                 <ul className="menu-toc">
                   {items.map((item) => (
                     <li key={`${item.pdfPage}-${item.title}`}>
@@ -211,16 +214,72 @@ export function ReaderMenu({
           </section>
 
           <section className="menu-section">
-            <h2 className="card-label">字体大小</h2>
+            <h2 className="card-label">{t('menu.font')}</h2>
+            <ul className="font-list">
+              <li className="font-row">
+                <button
+                  type="button"
+                  className={settings.fontId ? undefined : 'selected'}
+                  onClick={() => onSettings({ fontId: null })}
+                >
+                  {t('menu.fontDefault')}
+                </button>
+              </li>
+              {fonts.map((font) => (
+                <li className="font-row" key={font.id}>
+                  <button
+                    type="button"
+                    className={settings.fontId === font.id ? 'selected' : undefined}
+                    style={{ fontFamily: font.family }}
+                    onClick={() => onSettings({ fontId: font.id })}
+                  >
+                    {font.name}
+                  </button>
+                  <button
+                    type="button"
+                    className="font-delete"
+                    onClick={() => {
+                      if (settings.fontId === font.id) onSettings({ fontId: null })
+                      void removeFont(font.id)
+                    }}
+                  >
+                    {t('menu.fontDelete')}
+                  </button>
+                </li>
+              ))}
+            </ul>
+            {fontError && <p className="menu-note">{fontError}</p>}
+            <button type="button" className="font-upload" onClick={() => fontInput.current?.click()}>
+              {t('menu.fontUpload')}
+            </button>
+            <input
+              ref={fontInput}
+              type="file"
+              accept=".ttf,.otf,font/ttf,font/otf"
+              hidden
+              onChange={(event) => {
+                const file = event.target.files?.[0]
+                event.target.value = ''
+                if (!file) return
+                setFontError(null)
+                addFont(file).catch((error: unknown) => {
+                  setFontError(error instanceof Error ? error.message : t('fonts.loadFailed'))
+                })
+              }}
+            />
+          </section>
+
+          <section className="menu-section">
+            <h2 className="card-label">{t('menu.fontSize')}</h2>
             <label className="slider-row">
-              <span>小</span>
+              <span>{t('menu.small')}</span>
               <input
                 type="range"
                 min={15}
                 max={24}
                 step={1}
                 value={settings.fontSize}
-                aria-label="字体大小"
+                aria-label={t('menu.fontSizeLabel')}
                 onChange={(event) => onSettings({ fontSize: Number(event.target.value) })}
               />
               <span>{settings.fontSize}</span>
@@ -228,58 +287,58 @@ export function ReaderMenu({
           </section>
 
           <section className="menu-section">
-            <h2 className="card-label">布局</h2>
+            <h2 className="card-label">{t('menu.layout')}</h2>
             <label className="slider-row">
-              <span>行距</span>
+              <span>{t('menu.leading')}</span>
               <input
                 type="range"
                 min={1.4}
                 max={2.2}
                 step={0.05}
                 value={settings.lineHeight}
-                aria-label="行距"
+                aria-label={t('menu.leadingLabel')}
                 onChange={(event) => onSettings({ lineHeight: Number(event.target.value) })}
               />
               <span>{settings.lineHeight.toFixed(2)}</span>
             </label>
             <label className="slider-row">
-              <span>边距</span>
+              <span>{t('menu.margin')}</span>
               <input
                 type="range"
                 min={12}
                 max={80}
                 step={2}
                 value={settings.margin}
-                aria-label="页边距"
+                aria-label={t('menu.marginLabel')}
                 onChange={(event) => onSettings({ margin: Number(event.target.value) })}
               />
               <span>{settings.margin}</span>
             </label>
-            <div className="choice-row" role="group" aria-label="背景色">
-              {THEMES.map((theme) => (
+            <div className="choice-row" role="group" aria-label={t('menu.theme')}>
+              {THEME_IDS.map((id) => (
                 <button
-                  key={theme.id}
+                  key={id}
                   type="button"
-                  className={`choice theme-${theme.id}${settings.theme === theme.id ? ' selected' : ''}`}
-                  aria-pressed={settings.theme === theme.id}
-                  onClick={() => onSettings({ theme: theme.id })}
+                  className={`choice theme-${id}${settings.theme === id ? ' selected' : ''}`}
+                  aria-pressed={settings.theme === id}
+                  onClick={() => onSettings({ theme: id })}
                 >
-                  {theme.label}
+                  {t(`menu.${id}`)}
                 </button>
               ))}
             </div>
           </section>
 
           <section className="menu-section">
-            <h2 className="card-label">翻页方式</h2>
-            <div className="choice-row" role="group" aria-label="翻页方式">
+            <h2 className="card-label">{t('menu.pageMode')}</h2>
+            <div className="choice-row" role="group" aria-label={t('menu.pageMode')}>
               <button
                 type="button"
                 className={settings.pageMode === 'scroll' ? 'choice selected' : 'choice'}
                 aria-pressed={settings.pageMode === 'scroll'}
                 onClick={() => onSettings({ pageMode: 'scroll' })}
               >
-                上下滚动
+                {t('menu.scroll')}
               </button>
               <button
                 type="button"
@@ -287,11 +346,11 @@ export function ReaderMenu({
                 aria-pressed={settings.pageMode === 'flip'}
                 onClick={() => onSettings({ pageMode: 'flip' })}
               >
-                左右翻页
+                {t('menu.flip')}
               </button>
             </div>
             <p className="menu-note">
-              {settings.pageMode === 'flip' ? '左右滑动翻页，也可以用键盘的左右方向键。' : '整篇连续往下读，读到哪一页会自动记住。'}
+              {settings.pageMode === 'flip' ? t('menu.flipHint') : t('menu.scrollHint')}
             </p>
           </section>
         </div>

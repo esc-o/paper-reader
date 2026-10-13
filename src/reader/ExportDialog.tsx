@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useTranslation } from 'react-i18next'
 import { exportNotes, ExportError } from '../lib/exportDocx'
 import type { ExportOptions } from '../lib/exportDocx'
-import { COLOR_NAMES, HIGHLIGHT_COLORS } from '../lib/types'
+import { HIGHLIGHT_COLORS } from '../lib/types'
 import type { Annotation, Book, HighlightColor } from '../lib/types'
 import './ExportDialog.css'
 
@@ -15,6 +16,7 @@ export function ExportDialog({
   annotations: Annotation[]
   onClose: () => void
 }) {
+  const { t } = useTranslation()
   const [all, setAll] = useState(true)
   const [commentsOnly, setCommentsOnly] = useState(false)
   const [colors, setColors] = useState<HighlightColor[]>([])
@@ -44,7 +46,7 @@ export function ExportDialog({
       onClose()
     } catch (error) {
       console.error(error)
-      setMessage(error instanceof ExportError ? error.message : '导出失败，请重试。')
+      setMessage(error instanceof ExportError ? error.message : t('export.failed'))
       setBusy(false)
     }
   }
@@ -57,7 +59,7 @@ export function ExportDialog({
         aria-labelledby="export-title"
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <h2 id="export-title">导出笔记</h2>
+        <h2 id="export-title">{t('export.title')}</h2>
         <p className="export-book">{book.title}</p>
         <label className="export-check">
           <input
@@ -71,7 +73,7 @@ export function ExportDialog({
               }
             }}
           />
-          全部导出
+          {t('export.all')}
         </label>
         <label className={`export-check${all ? ' disabled' : ''}`}>
           <input
@@ -80,10 +82,10 @@ export function ExportDialog({
             disabled={all}
             onChange={(event) => setCommentsOnly(event.target.checked)}
           />
-          只导出有评论的
+          {t('export.commentsOnly')}
         </label>
         <fieldset className="export-colors" disabled={all}>
-          <legend>只导出这些颜色的高亮</legend>
+          <legend>{t('export.colors')}</legend>
           <div className="export-swatches">
             {HIGHLIGHT_COLORS.map((color) => (
               <button
@@ -91,7 +93,7 @@ export function ExportDialog({
                 type="button"
                 className={`swatch swatch-${color}${colors.includes(color) ? ' selected' : ''}`}
                 aria-pressed={colors.includes(color)}
-                aria-label={COLOR_NAMES[color]}
+                aria-label={t(`colors.${color}`)}
                 disabled={all}
                 onClick={() => toggleColor(color)}
               />
@@ -101,10 +103,10 @@ export function ExportDialog({
         {message && <p className="export-message">{message}</p>}
         <div className="export-actions">
           <button type="button" className="text-button" onClick={onClose}>
-            取消
+            {t('export.cancel')}
           </button>
           <button type="button" className="solid-button" disabled={busy || nothingChosen} onClick={confirm}>
-            {busy ? '正在导出…' : '导出 Word'}
+            {busy ? t('export.exporting') : t('export.word')}
           </button>
         </div>
       </div>

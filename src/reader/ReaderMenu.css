@@ -161,6 +161,55 @@
   accent-color: var(--reader-text, var(--ink));
 }
 
+.font-list {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+}
+
+.font-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+}
+
+.font-row button:first-child {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--reader-line, var(--line));
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.font-row button.selected {
+  border-color: var(--reader-text, var(--ink));
+  font-weight: 700;
+}
+
+.font-delete,
+.font-upload {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.font-upload {
+  padding: 8px 0;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .choice-row {
   display: flex;
   gap: 8px;

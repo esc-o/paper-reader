@@ -17,6 +17,10 @@ export type Book = {
   addedAt: number
   lastReadAt: number | null
   currentPage: number
+  /** Set when the cloud knows this file but this browser does not have the PDF yet. */
+  needsFile?: boolean
+  /** When progress or book metadata last changed. Used to merge devices. */
+  updatedAt?: number
 }
 
 export const HIGHLIGHT_COLORS = ['yellow', 'green', 'pink', 'blue'] as const

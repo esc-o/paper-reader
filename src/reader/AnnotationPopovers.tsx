@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { Annotation, HighlightColor } from '../lib/types'
 import { ColorSwatches } from './ColorSwatches'
 import { Floating } from './Floating'
@@ -20,6 +21,7 @@ function CommentEditor({
   const [value, setValue] = useState(initial)
   const ref = useRef<HTMLTextAreaElement>(null)
   const trimmed = value.trim()
+  const { t } = useTranslation()
 
   useEffect(() => {
     const el = ref.current
@@ -33,7 +35,7 @@ function CommentEditor({
         ref={ref}
         value={value}
         rows={4}
-        placeholder="写下你的想法…（Ctrl + Enter 保存）"
+        placeholder={t('comment.placeholder')}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && trimmed) onSave(trimmed)
@@ -41,10 +43,10 @@ function CommentEditor({
       />
       <div className="popover-actions">
         <button type="button" className="text-button" onClick={onCancel}>
-          取消
+          {t('comment.cancel')}
         </button>
         <button type="button" className="solid-button" disabled={!trimmed} onClick={() => onSave(trimmed)}>
-          保存
+          {t('comment.save')}
         </button>
       </div>
     </div>
@@ -62,9 +64,10 @@ export function NewCommentPopover({
   onSave: (text: string) => void
   onClose: () => void
 }) {
+  const { t } = useTranslation()
   return (
     <Floating anchor={anchor} className="popover comment-popover" onClose={onClose}>
-      <p className="popover-title">写评论</p>
+      <p className="popover-title">{t('comment.write')}</p>
       <Quote text={quote} />
       <CommentEditor onSave={onSave} onCancel={onClose} />
     </Floating>
@@ -84,11 +87,12 @@ export function CommentPopover({
   onDelete: () => void
   onClose: () => void
 }) {
+  const { t } = useTranslation()
   const [editing, setEditing] = useState(false)
 
   return (
     <Floating anchor={anchor} className="popover comment-popover" onClose={onClose}>
-      <p className="popover-title">评论</p>
+      <p className="popover-title">{t('comment.title')}</p>
       <Quote text={annotation.text} />
       {editing ? (
         <CommentEditor
@@ -107,13 +111,13 @@ export function CommentPopover({
               type="button"
               className="text-button danger"
               onClick={() => {
-                if (window.confirm('删除这条评论？')) onDelete()
+                if (window.confirm(t('comment.deleteConfirm'))) onDelete()
               }}
             >
-              删除
+              {t('comment.delete')}
             </button>
             <button type="button" className="solid-button" onClick={() => setEditing(true)}>
-              编辑
+              {t('comment.edit')}
             </button>
           </div>
         </>
@@ -135,16 +139,17 @@ export function MarksPopover({
   onDelete: (id: string) => void
   onClose: () => void
 }) {
+  const { t } = useTranslation()
   return (
     <Floating anchor={anchor} className="popover marks-popover" onClose={onClose}>
       {annotations.map((a) => {
-        const label = a.kind === 'highlight' ? '高亮' : '划线'
+        const label = a.kind === 'highlight' ? t('toolbar.highlight') : t('toolbar.underline')
         return (
           <div className="marks-row" key={a.id}>
             <span className="marks-label">{label}</span>
             <ColorSwatches value={a.color} labelPrefix={label} onPick={(c) => onChangeColor(a.id, c)} />
             <button type="button" className="text-button danger" onClick={() => onDelete(a.id)}>
-              删除
+              {t('comment.delete')}
             </button>
           </div>
         )

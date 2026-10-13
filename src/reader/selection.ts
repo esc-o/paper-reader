@@ -35,8 +35,9 @@ export function clearBrowserSelection() {
 
 /**
  * Converts the browser selection inside `container` into offsets within paragraphs.
- * Paragraph text elements are marked with `data-paragraph-id`, and their text content
- * must be exactly the paragraph text.
+ * Paragraph text elements are marked with `data-paragraph-id`. A full paragraph's
+ * text content matches the paragraph. A screen-page slice sets `data-char-offset`
+ * to where that slice starts in the paragraph.
  */
 export function readSelection(container: HTMLElement | null): PendingSelection | null {
   const selection = window.getSelection()
@@ -57,8 +58,9 @@ export function readSelection(container: HTMLElement | null): PendingSelection |
       : text.length
     while (start < end && /\s/.test(text[start])) start++
     while (end > start && /\s/.test(text[end - 1])) end--
+    const base = Number(el.dataset.charOffset ?? 0)
     if (end > start) {
-      ranges.push({ paragraphId: Number(el.dataset.paragraphId), start, end })
+      ranges.push({ paragraphId: Number(el.dataset.paragraphId), start: start + base, end: end + base })
       texts.push(text.slice(start, end))
     }
   })

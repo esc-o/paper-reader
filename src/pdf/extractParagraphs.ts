@@ -1,6 +1,7 @@
 import { getDocument, GlobalWorkerOptions, PasswordException } from 'pdfjs-dist'
 import type { TextItem } from 'pdfjs-dist/types/src/display/api'
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
+import i18n from '../i18n'
 import { finalizeParagraphs, parseTocLine } from '../lib/toc'
 import type { TocEntry } from '../lib/toc'
 
@@ -45,9 +46,9 @@ export async function extractPdf(
     pdf = await loadingTask.promise
   } catch (error) {
     if (error instanceof PasswordException) {
-      throw new ExtractionError('这个 PDF 有密码保护，暂时不支持。')
+      throw new ExtractionError(i18n.t('errors.password'))
     }
-    throw new ExtractionError('这个文件打不开，可能不是有效的 PDF。')
+    throw new ExtractionError(i18n.t('errors.invalid'))
   }
 
   const paragraphs: Paragraph[] = []
@@ -96,7 +97,7 @@ export async function extractPdf(
   }
 
   if (paragraphs.length === 0) {
-    throw new ExtractionError('没有找到可提取的文字。它可能是扫描版（图片）PDF。')
+    throw new ExtractionError(i18n.t('errors.noText'))
   }
 
   const metaTitle = typeof info.Title === 'string' ? info.Title.trim() : ''
