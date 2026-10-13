@@ -69,6 +69,44 @@ export function readSelection(container: HTMLElement | null): PendingSelection |
   return { ranges, text: texts.join(' '), anchor: anchorFromRect(range.getBoundingClientRect()) }
 }
 
+/** Selects the word under a double-tap. Latin runs stay together; one CJK character is a word. */
+export function selectWordAt(x: number, y: number): boolean {
+  const hit = caretAt(x, y)
+  if (!hit || hit.node.nodeType !== Node.TEXT_NODE) return false
+  const text = hit.node.textContent ?? ''
+  if (!text) return false
+  let index = Math.min(hit.offset, text.length - 1)
+  if (index > 0 && (index >= text.length || /\s/.test(text[index]))) index -= 1
+  if (index < 0 || /\s/.test(text[index])) return false
+  const wordChar = (char: string) => /[\p{Script=Latin}\p{N}'’\-]/u.test(char)
+  let start = index
+  let end = index + 1
+  if (wordChar(text[index])) {
+    while (start > 0 && wordChar(text[start - 1])) start -= 1
+    while (end < text.length && wordChar(text[end])) end += 1
+  }
+  const range = document.createRange()
+  range.setStart(hit.node, start)
+  range.setEnd(hit.node, end)
+  const selection = window.getSelection()
+  if (!selection) return false
+  selection.removeAllRanges()
+  selection.addRange(range)
+  return true
+}
+
+function caretAt(x: number, y: number): { node: Node; offset: number } | null {
+  const doc = document as Document & {
+    caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null
+    caretRangeFromPoint?: (x: number, y: number) => Range | null
+  }
+  const position = doc.caretPositionFromPoint?.(x, y)
+  if (position) return { node: position.offsetNode, offset: position.offset }
+  const range = doc.caretRangeFromPoint?.(x, y)
+  if (!range) return null
+  return { node: range.startContainer, offset: range.startOffset }
+}
+
 function offsetWithin(element: HTMLElement, node: Node, offset: number): number {
   const range = document.createRange()
   range.selectNodeContents(element)

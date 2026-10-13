@@ -106,8 +106,8 @@ const en: Dictionary = {
     folders: 'Folders',
   },
   drop: {
-    title: 'Drop a PDF here, or click to choose a file',
-    hint: 'The PDF stays in this browser and is not uploaded',
+    title: 'Drag in a PDF, or click to browse',
+    hint: 'Your file stays in your browser and never leaves this device',
   },
   reader: {
     opening: 'Opening…',
@@ -145,7 +145,8 @@ const en: Dictionary = {
     pageMode: 'Paging',
     scroll: 'Scroll',
     flip: 'Flip',
-    flipHint: 'On a phone, drag a page corner to turn. On a computer, swipe or use the arrow keys.',
+    flipMobile: 'Mobile: drag the page corner.',
+    flipDesktop: 'Desktop: swipe or use the arrow keys.',
     scrollHint: 'Read straight down. The page you reach is remembered.',
     font: 'Font',
     fontDefault: 'System default',

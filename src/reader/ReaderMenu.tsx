@@ -161,6 +161,15 @@ export function ReaderMenu({
   const items = tocItems(book)
   const current = items.reduce((found, item) => (item.pdfPage <= page ? item : found), undefined as TocItem | undefined)
   const usingHeadings = (book.toc ?? []).length === 0
+  const menuBody = useRef<HTMLDivElement>(null)
+
+  function jumpToToc() {
+    const section = document.getElementById('menu-toc')
+    const body = menuBody.current
+    if (!section || !body) return
+    const top = section.getBoundingClientRect().top - body.getBoundingClientRect().top + body.scrollTop
+    body.scrollTo({ top: Math.max(0, top - 8), behavior: 'smooth' })
+  }
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -176,15 +185,20 @@ export function ReaderMenu({
       <aside className="reader-menu" role="dialog" aria-label={t('menu.label')} onMouseDown={(event) => event.stopPropagation()}>
         <div className="sheet-handle" />
         <header className="menu-header">
-          <button type="button" className="menu-export" onClick={onExport}>
-            {t('menu.export')}
-          </button>
+          <div className="menu-header-actions">
+            <button type="button" className="menu-export" onClick={onExport}>
+              {t('menu.export')}
+            </button>
+            <button type="button" className="menu-export" onClick={jumpToToc}>
+              {t('menu.toc')}
+            </button>
+          </div>
           <button type="button" className="icon-button" aria-label={t('menu.closeButton')} onClick={onClose}>
             ✕
           </button>
         </header>
-        <div className="menu-body">
-          <section className="menu-section">
+        <div className="menu-body" ref={menuBody}>
+          <section className="menu-section" id="menu-toc">
             <h2 className="card-label">{t('menu.toc')}</h2>
             {items.length === 0 ? (
               <p className="menu-empty">{t('menu.noToc')}</p>
@@ -349,9 +363,14 @@ export function ReaderMenu({
                 {t('menu.flip')}
               </button>
             </div>
-            <p className="menu-note">
-              {settings.pageMode === 'flip' ? t('menu.flipHint') : t('menu.scrollHint')}
-            </p>
+            {settings.pageMode === 'flip' ? (
+              <p className="menu-page-hint">
+                <span>{t('menu.flipMobile')}</span>
+                <span>{t('menu.flipDesktop')}</span>
+              </p>
+            ) : (
+              <p className="menu-page-hint">{t('menu.scrollHint')}</p>
+            )}
           </section>
         </div>
       </aside>

@@ -81,9 +81,10 @@ export function HomePage() {
 
   return (
     <div className="home">
-      <SiteChrome active="home" showBrand />
+      <SiteChrome active="home" />
       <section className="home-hero">
         <div className="hero-main">
+          {compact && <HeroProgress label={t('home.progress')} percent={percent} />}
           <p className="hero-status">
             <span className="status-dot" />
             {book ? t('home.reading', { page: book.currentPage, total: book.numPages }) : t('home.nothing')}
@@ -134,17 +135,22 @@ export function HomePage() {
         <footer className="hero-footer">
           {book?.needsFile && <span className="file-missing">{t('fileMissing.lead')}</span>}
           {book?.lastReadAt && !book.needsFile ? t('home.lastRead', { time: formatLastRead(book.lastReadAt) }) : null}
-          <span className="hero-footer-note">{book ? t('home.savedAccount') : t('home.localOnly')}</span>
+          <HintText text={book ? t('home.savedAccount') : t('home.localOnly')} english={!i18n.language.startsWith('zh')} />
         </footer>
       </section>
 
+      {!compact && (
       <section className="home-cards">
-        {phone || compact ? (
-          <RingCard
-            value={percent}
-            center={`${percent}%`}
-            caption={t('home.progress')}
-          />
+        {phone ? (
+          <article className="card card-progress-line">
+            <header className="progress-line-head">
+              <span className="card-label">{t('home.progress')}</span>
+              <span className="progress-line-percent">{percent}%</span>
+            </header>
+            <div className="progress-track">
+              <div className="progress-fill" style={{ width: `${percent}%` }} />
+            </div>
+          </article>
         ) : (
           <article className="card card-progress">
             <header className="card-head">
@@ -167,12 +173,6 @@ export function HomePage() {
             </header>
             <WeekLine week={week} />
           </article>
-        ) : compact ? (
-          <RingCard
-            value={Math.min(100, Math.round((weekTotal / 60) * 100))}
-            center={String(weekTotal)}
-            caption={t('home.minutes')}
-          />
         ) : (
           <article className="card">
             <header className="card-head">
@@ -196,37 +196,39 @@ export function HomePage() {
           </article>
         )}
 
-        {!compact && <NotesStats counts={data?.counts} showEyebrow={showEyebrow} placement="card" />}
+        <NotesStats counts={data?.counts} showEyebrow={showEyebrow} placement="card" />
       </section>
+      )}
     </div>
   )
 }
 
-function RingCard({ value, center, caption }: { value: number; center: string; caption: string }) {
-  const radius = 42
-  const circumference = 2 * Math.PI * radius
-  const filled = Math.min(100, Math.max(0, value))
-  const offset = circumference * (1 - filled / 100)
+function HintText({ text, english }: { text: string; english: boolean }) {
+  if (!english) return <span className="hero-footer-note">{text}</span>
+  const lines = text.split(/(?<=\.)\s+/).filter(Boolean)
   return (
-    <article className="card card-ring">
-      <div className="ring">
-        <svg viewBox="0 0 120 120" aria-hidden="true">
-          <circle className="ring-track" cx="60" cy="60" r={radius} />
-          <circle
-            className="ring-value"
-            cx="60"
-            cy="60"
-            r={radius}
-            strokeDasharray={circumference}
-            strokeDashoffset={offset}
-          />
-        </svg>
-        <div className="ring-copy">
-          <strong>{center}</strong>
-          <span>{caption}</span>
+    <span className="hero-footer-note">
+      {lines.map((line) => (
+        <span className="hero-footer-line" key={line}>{line}</span>
+      ))}
+    </span>
+  )
+}
+
+function HeroProgress({ label, percent }: { label: string; percent: number }) {
+  const value = Math.min(100, Math.max(0, percent))
+  return (
+    <div className="hero-progress">
+      <span className="card-label">{label}</span>
+      <div className="scrub">
+        <div className="scrub-track">
+          <div className="scrub-fill" style={{ width: `${value}%` }} />
+          <div className="scrub-knob" style={{ left: `${value}%` }}>
+            <span className="scrub-bubble">{value}%</span>
+          </div>
         </div>
       </div>
-    </article>
+    </div>
   )
 }
 

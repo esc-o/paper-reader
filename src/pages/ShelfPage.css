@@ -166,8 +166,40 @@
   min-width: 220px;
 }
 
-.folder-pane .card-label {
+.folder-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin: 18px 0 10px;
+}
+
+.folder-pane .folder-heading .card-label,
+.folder-heading .card-label {
+  margin: 0;
+}
+
+.folder-heading-label {
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.folder-mobile {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.folder-mobile .folder-heading {
+  margin: 0;
+}
+
+.shelf-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
 .folder-list,
@@ -225,9 +257,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex: none;
   width: 32px;
   height: 32px;
-  margin-top: 4px;
+  margin-top: 0;
   padding: 0;
   border: 1px solid var(--line);
   border-radius: var(--radius-button);
@@ -243,7 +276,7 @@
 .folder-form input,
 .shelf-search,
 .shelf-sort select,
-.folder-select-label select,
+.folder-select,
 .tag-form input,
 .menu-field select,
 .menu-field input {
@@ -258,13 +291,12 @@
   font-size: 14px;
 }
 
-.folder-select-label,
 .shelf-sort,
 .menu-field {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin: 0 0 12px;
+  margin: 0;
   font-size: 12px;
   font-weight: 650;
   letter-spacing: 0.08em;
@@ -275,9 +307,9 @@
 .shelf-tools {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 180px;
-  gap: 10px;
+  gap: 14px;
   align-items: end;
-  margin-top: 18px;
+  margin-top: 0;
 }
 
 .shelf-search,
@@ -307,7 +339,7 @@
 }
 
 .tag-bar {
-  margin-top: 14px;
+  margin-top: 0;
 }
 
 .book-tags {

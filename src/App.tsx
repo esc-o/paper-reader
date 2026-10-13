@@ -6,7 +6,9 @@ import { ShelfPage } from './pages/ShelfPage'
 
 function App() {
   const route = useHashRoute()
-  if (route.name === 'reader') return <ReaderPage key={route.bookId} bookId={route.bookId} />
+  if (route.name === 'reader') {
+    return <ReaderPage key={`${route.bookId}:${route.noteId ?? ''}`} bookId={route.bookId} noteId={route.noteId} />
+  }
   if (route.name === 'shelf') return <ShelfPage />
   if (route.name === 'notes') return <NotesPage />
   return <HomePage />

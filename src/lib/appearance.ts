@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { followAppearance } from './settings'
 
 const KEY = 'paper-reader.appearance'
 export type Appearance = 'day' | 'night'
@@ -16,6 +17,7 @@ export function applyAppearance(mode: Appearance) {
 }
 
 applyAppearance(readAppearance())
+followAppearance(readAppearance(), false)
 
 export function useAppearance() {
   const [mode, setMode] = useState<Appearance>(readAppearance)
@@ -31,6 +33,7 @@ export function useAppearance() {
       /* private mode */
     }
     setMode(next)
+    followAppearance(next, true)
   }
 
   return { mode, setAppearance }

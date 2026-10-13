@@ -181,7 +181,7 @@ export function LibraryShell({
           </div>
         ),
       )}
-      {addingFolder ? folderNameForm(() => void createFolder()) : addButton}
+      {addingFolder ? folderNameForm(() => void createFolder()) : null}
     </>
   )
 
@@ -202,19 +202,28 @@ export function LibraryShell({
       <div className="shelf-body">
         {!narrow && (
           <aside className="folder-pane">
-            <p className="card-label">{t('shelf.folders')}</p>
+            <div className="folder-heading">
+              <p className="card-label">{t('shelf.folders')}</p>
+              {!addingFolder && addButton}
+            </div>
             <div className="folder-list">{folderControls}</div>
           </aside>
         )}
         <main className="shelf-main">
           <p className="card-label">{kicker}</p>
           <h1 className="shelf-title">{currentFolder?.name ?? title}</h1>
+          <div className="shelf-controls">
           {beforeFilters}
           {narrow && (
-            <label className="folder-select-label">
-              {t('shelf.folders')}
+            <div className="folder-mobile">
+              <div className="folder-heading">
+                <span className="folder-heading-label">{t('shelf.folders')}</span>
+                {!(addingFolder || (currentFolder && renamingId === currentFolder.id)) && addButton}
+              </div>
               <select
+                className="folder-select"
                 value={folderChoice}
+                aria-label={t('shelf.folders')}
                 onChange={(event) => {
                   setFolderChoice(event.target.value)
                   setRenamingId(null)
@@ -226,21 +235,21 @@ export function LibraryShell({
                   <option key={folder.id} value={folder.id}>{folder.name}</option>
                 ))}
               </select>
-            </label>
-          )}
-          {narrow && (
-            <div className="folder-mobile-actions">
-              {currentFolder && renamingId !== currentFolder.id && (
-                <>
-                  <button type="button" onClick={() => startRename(currentFolder)}>{t('shelf.rename')}</button>
-                  <button type="button" onClick={() => void removeFolder(currentFolder)}>{t('shelf.deleteFolder')}</button>
-                </>
+              {(currentFolder || addingFolder) && (
+                <div className="folder-mobile-actions">
+                  {currentFolder && renamingId !== currentFolder.id && (
+                    <>
+                      <button type="button" onClick={() => startRename(currentFolder)}>{t('shelf.rename')}</button>
+                      <button type="button" onClick={() => void removeFolder(currentFolder)}>{t('shelf.deleteFolder')}</button>
+                    </>
+                  )}
+                  {currentFolder && renamingId === currentFolder.id
+                    ? folderNameForm(() => void renameFolder())
+                    : addingFolder
+                      ? folderNameForm(() => void createFolder())
+                      : null}
+                </div>
               )}
-              {currentFolder && renamingId === currentFolder.id
-                ? folderNameForm(() => void renameFolder())
-                : addingFolder
-                  ? folderNameForm(() => void createFolder())
-                  : addButton}
             </div>
           )}
           <div className="shelf-tools">
@@ -314,6 +323,7 @@ export function LibraryShell({
                 {t('shelf.newTag')}
               </button>
             )}
+          </div>
           </div>
           {children(library)}
         </main>

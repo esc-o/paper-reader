@@ -20,7 +20,7 @@ import { ExportDialog } from '../reader/ExportDialog'
 import { LookupPanel } from '../reader/LookupPanel'
 import { ReaderMenu, ReadingFab } from '../reader/ReaderMenu'
 import { SelectionToolbar } from '../reader/SelectionToolbar'
-import { clearBrowserSelection, hasTextSelection, readSelection } from '../reader/selection'
+import { clearBrowserSelection, hasTextSelection, readSelection, selectWordAt } from '../reader/selection'
 import type { Anchor, PendingSelection } from '../reader/selection'
 import './ReaderPage.css'
 
@@ -31,7 +31,7 @@ type Popover =
   | { kind: 'marks'; anchor: Anchor; ids: string[] }
   | { kind: 'comment'; anchor: Anchor; id: string }
 
-export function ReaderPage({ bookId }: { bookId: string }) {
+export function ReaderPage({ bookId, noteId }: { bookId: string; noteId?: string }) {
   const [book, setBook] = useState<Book | null | undefined>(undefined)
   const [page, setPage] = useState(1)
   const [turn, setTurn] = useState<1 | -1 | 0>(0)
@@ -53,6 +53,10 @@ export function ReaderPage({ bookId }: { bookId: string }) {
   const menuOpenRef = useRef(menuOpen)
   const [reimportError, setReimportError] = useState<string | null>(null)
   const [reimporting, setReimporting] = useState(false)
+  const lastTapAt = useRef(0)
+  const lastTapX = useRef(0)
+  const lastTapY = useRef(0)
+  const tapTimer = useRef<number | undefined>(undefined)
   useEffect(() => {
     pageRef.current = page
     menuOpenRef.current = menuOpen
@@ -309,12 +313,78 @@ export function ReaderPage({ bookId }: { bookId: string }) {
     setPopover(null)
   }
 
+  useEffect(() => {
+    return () => window.clearTimeout(tapTimer.current)
+  }, [])
+
+  useEffect(() => {
+    if (!noteId || !book || book.needsFile) return
+    const note = annotations.find((item) => item.id === noteId)
+    const range = note?.ranges[0]
+    if (!note || !range) return
+    let stopped = false
+    let moved = false
+    let attempts = 0
+    let timer = 0
+    const paragraph = book.paragraphs.find((item) => item.id === range.paragraphId)
+    const pdfPage = paragraph?.startPage ?? note.page
+    const tick = () => {
+      if (stopped) return
+      attempts += 1
+      const curling = settings.pageMode === 'flip' && narrow
+      if (curling) {
+        const placed = curlRef.current?.jumpToText(range.paragraphId, range.start) ?? false
+        if (!placed) {
+          if (attempts < 12) timer = window.setTimeout(tick, 180)
+          return
+        }
+      } else if (settings.pageMode !== 'scroll' && !moved) {
+        moved = true
+        goToPage(pdfPage)
+      }
+      if (!curling && settings.pageMode !== 'scroll' && pageRef.current !== pdfPage) {
+        if (attempts < 12) timer = window.setTimeout(tick, 180)
+        return
+      }
+      if (flashNote(contentRef.current, note.id)) return
+      if (attempts < 12) timer = window.setTimeout(tick, 180)
+    }
+    timer = window.setTimeout(tick, 80)
+    return () => {
+      stopped = true
+      window.clearTimeout(timer)
+    }
+  }, [annotations, book, goToPage, narrow, noteId, settings.pageMode])
+
   function onReaderClick(event: ReactMouseEvent) {
     if (lookupText || menuOpen) return
     const target = event.target
     if (!(target instanceof Element)) return
-    if (target.closest('a, button, input, textarea, .mark, .comment-bubble, .floating')) return
+    if (target.closest('a, button, input, textarea, .mark, .comment-bubble, .floating, .reading-fab, .pager')) return
     if (hasTextSelection()) return
+    if (narrow) {
+      const now = Date.now()
+      const close =
+        now - lastTapAt.current < 300 &&
+        Math.hypot(event.clientX - lastTapX.current, event.clientY - lastTapY.current) < 36
+      if (close) {
+        window.clearTimeout(tapTimer.current)
+        lastTapAt.current = 0
+        selectWordAt(event.clientX, event.clientY)
+        return
+      }
+      lastTapAt.current = now
+      lastTapX.current = event.clientX
+      lastTapY.current = event.clientY
+      const ratio = event.clientX / window.innerWidth
+      if (ratio >= 0.36 && ratio <= 0.64) return
+      const delta = ratio < 0.36 ? -1 : 1
+      tapTimer.current = window.setTimeout(() => {
+        if (curlRef.current) curlRef.current.flip(delta)
+        else goToPage(pageRef.current + delta)
+      }, 280)
+      return
+    }
     const x = event.clientX / window.innerWidth
     const y = event.clientY / window.innerHeight
     if (x < 0.3 || x > 0.7 || y < 0.22 || y > 0.78) return
@@ -574,3 +644,20 @@ function PageSection({
 }
 
 const NO_ANNOTATIONS: Annotation[] = []
+
+function flashNote(root: HTMLElement | null, id: string): boolean {
+  if (!root || typeof CSS === 'undefined' || !CSS.escape) return false
+  const escaped = CSS.escape(id)
+  const nodes = [...root.querySelectorAll<HTMLElement>(`[data-mark-ids~="${escaped}"], [data-comment-id="${escaped}"]`)]
+  const visible = nodes.filter((node) => {
+    const rect = node.getBoundingClientRect()
+    return rect.width > 0 && rect.height > 0
+  })
+  if (visible.length === 0) return false
+  visible[0].scrollIntoView({ block: 'center', inline: 'nearest' })
+  for (const node of visible) node.classList.add('locate-flash')
+  window.setTimeout(() => {
+    for (const node of visible) node.classList.remove('locate-flash')
+  }, 1500)
+  return true
+}

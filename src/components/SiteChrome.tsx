@@ -3,11 +3,10 @@ import { routes } from '../lib/router'
 import { TopActions } from './TopActions'
 import './SiteChrome.css'
 
-export function SiteChrome({ active, showBrand = false }: { active?: 'home' | 'shelf' | 'notes'; showBrand?: boolean }) {
+export function SiteChrome({ active }: { active?: 'home' | 'shelf' | 'notes' }) {
   const { t } = useTranslation()
   return (
-    <header className={`site-chrome${showBrand ? ' site-chrome-home' : ''}`}>
-      {showBrand && <span className="site-brand">Paper Reader</span>}
+    <header className="site-chrome">
       <nav className="site-links">
         <a href={routes.home} className={active === 'home' ? 'active' : undefined}>{t('nav.home')}</a>
         <a href={routes.shelf} className={active === 'shelf' ? 'active' : undefined}>{t('nav.shelf')}</a>

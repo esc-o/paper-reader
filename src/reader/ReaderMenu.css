@@ -48,6 +48,7 @@
   background: var(--reader-panel, #fffdf9);
   color: var(--reader-text, var(--ink));
   box-shadow: 0 0 40px rgba(43, 34, 32, 0.18);
+  overflow: hidden;
 }
 
 .reader-menu .sheet-handle {
@@ -60,6 +61,12 @@
   justify-content: space-between;
   gap: 12px;
   padding: 16px 16px 8px;
+}
+
+.menu-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .menu-export {
@@ -75,18 +82,22 @@
 }
 
 .menu-body {
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
-  padding: 4px 16px 28px;
+  padding: 8px 16px 28px;
   overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
 }
 
 .menu-section {
-  margin-top: 18px;
+  margin: 0;
 }
 
 .menu-section h2 {
-  margin: 0 0 10px;
+  margin: 0 0 12px;
 }
 
 .menu-empty,
@@ -101,8 +112,6 @@
   margin: 0;
   padding: 0;
   list-style: none;
-  max-height: 38vh;
-  overflow-y: auto;
 }
 
 .menu-toc button {
@@ -146,9 +155,13 @@
   grid-template-columns: 36px 1fr 36px;
   align-items: center;
   gap: 8px;
-  margin: 8px 0;
+  margin: 0;
   font-size: 13px;
   color: var(--reader-muted, var(--muted));
+}
+
+.slider-row + .slider-row {
+  margin-top: 12px;
 }
 
 .slider-row span:last-child {
@@ -213,7 +226,19 @@
 .choice-row {
   display: flex;
   gap: 8px;
-  margin-top: 10px;
+  margin-top: 12px;
+}
+
+.menu-page-hint {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  margin: 12px 0 0;
+  text-align: center;
+  color: var(--reader-muted, var(--muted));
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .choice {
@@ -237,7 +262,7 @@
 
 .choice.theme-day { background: #f7f4ee; color: #2b2220; }
 .choice.theme-sepia { background: #f3ead7; color: #3b2f28; }
-.choice.theme-night { background: #1c1917; color: #f5f5f4; }
+.choice.theme-night { background: #1f1f22; color: #f5f5f4; }
 .choice.theme-day.selected,
 .choice.theme-sepia.selected,
 .choice.theme-night.selected {
@@ -261,6 +286,7 @@
     left: 0;
     right: 0;
     bottom: 0;
+    height: min(78vh, 100%);
     max-height: 78vh;
     border-radius: 16px 16px 0 0;
     animation: menu-in-up 0.22s ease-out;

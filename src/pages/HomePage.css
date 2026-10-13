@@ -115,10 +115,8 @@
 .hero-tag .tag-dot.purple { background: #b197fc; }
 
 .hero-description {
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  display: block;
+  white-space: pre-line;
   max-width: 460px;
   margin: 10px 0 0;
   font-size: 15px;
@@ -197,30 +195,95 @@
 }
 
 .hero-footer-note {
+  display: block;
+  max-width: 36rem;
   text-transform: none;
   letter-spacing: 0;
   font-size: 13px;
   font-weight: 500;
   line-height: 1.55;
+  white-space: normal;
+  overflow-wrap: anywhere;
   color: rgba(255, 255, 255, 0.72);
+}
+
+.hero-footer-line {
+  display: block;
+}
+
+.hero-progress {
+  max-width: 460px;
+  margin: 0 0 28px;
+}
+
+.hero-progress .card-label {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.scrub {
+  margin-top: 36px;
+  padding: 0 8px;
+}
+
+.scrub-track {
+  position: relative;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.scrub-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: #8ce99a;
+}
+
+.scrub-knob {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.28);
+}
+
+.scrub-bubble {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  padding: 2px 8px;
+  border-radius: var(--radius-button);
+  background: #fff;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+  white-space: nowrap;
 }
 
 .hero-notes {
   max-width: 460px;
   margin-top: 28px;
+  padding: 18px 18px 16px;
+  border-radius: var(--radius-card);
+  background: #fffdf9;
+  color: var(--ink);
 }
 
 .hero-notes .card-label,
 .hero-notes .stat-label {
-  color: rgba(255, 255, 255, 0.68);
+  color: var(--muted);
 }
 
 .hero-notes .stat-number {
-  color: #fff;
+  color: var(--ink);
 }
 
 .hero-notes .stat-dot.comment {
-  background: #fff;
+  background: var(--chocolate);
 }
 
 .file-missing {
@@ -293,6 +356,23 @@
   white-space: nowrap;
   text-overflow: ellipsis;
   color: var(--chocolate);
+}
+
+.progress-line-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.progress-line-percent {
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.card-progress-line .progress-track {
+  margin-top: 14px;
 }
 
 .progress-track {
@@ -417,8 +497,8 @@
 }
 
 .hero-notes .week-pill {
-  background: rgba(255, 255, 255, 0.12);
-  color: rgba(255, 255, 255, 0.82);
+  background: rgba(43, 34, 32, 0.06);
+  color: var(--muted);
 }
 
 .week-line svg {
@@ -507,11 +587,13 @@
 
 /* ---------- Phones: stack vertically ---------- */
 
-@media (max-width: 1023px) and (min-width: 768px) {
-  .home-cards {
-    align-items: center;
-    justify-content: center;
-    padding: 32px 20px;
+@media (max-width: 1023px) {
+  .home {
+    grid-template-columns: 1fr;
+  }
+
+  .home-hero {
+    min-width: 0;
   }
 }
 
@@ -522,16 +604,30 @@
   }
   .home-hero {
     min-width: 0;
-    padding: 88px 16px 26px;
+    padding: 20px 16px 26px;
   }
   .card-week-line {
     max-width: none;
   }
   .hero-main {
-    padding: 44px 0 36px;
+    padding: 12px 0 28px;
   }
   .home-cards {
     padding: 24px 20px 40px;
     gap: 16px;
+  }
+}
+
+@media (max-width: 767px) and (orientation: landscape) {
+  .home-cards {
+    flex-direction: row;
+    align-items: stretch;
+  }
+
+  .home-cards > .card {
+    flex: 1 1 0;
+    width: auto;
+    max-width: none;
+    margin: 0;
   }
 }

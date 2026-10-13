@@ -730,6 +730,28 @@ html.appearance-night .lookup-note.error {
   color: var(--muted);
 }
 
+.locate-flash {
+  background-color: var(--reader-text) !important;
+  color: var(--reader-bg) !important;
+  text-decoration-color: var(--reader-bg) !important;
+  border-radius: 2px;
+  box-shadow: 0 0 0 2px var(--reader-text);
+  animation: locate-flash 1.5s ease forwards;
+}
+
+@keyframes locate-flash {
+  0%,
+  60% {
+    background-color: var(--reader-text);
+    color: var(--reader-bg);
+  }
+  100% {
+    background-color: transparent;
+    color: inherit;
+    box-shadow: none;
+  }
+}
+
 .theme-day {
   --reader-bg: #f7f4ee;
   --reader-text: #2b2220;
@@ -751,11 +773,11 @@ html.appearance-night .lookup-note.error {
 }
 
 .theme-night {
-  --reader-bg: #1c1917;
+  --reader-bg: #1f1f22;
   --reader-text: #f5f5f4;
   --reader-muted: #a8a29e;
   --reader-line: #44403c;
-  --reader-bar: rgba(28, 25, 23, 0.94);
+  --reader-bar: rgba(31, 31, 34, 0.94);
   --reader-faint: rgba(245, 245, 244, 0.32);
   --reader-panel: #292524;
   color-scheme: dark;

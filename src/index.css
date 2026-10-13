@@ -41,13 +41,13 @@ body {
 
 html.appearance-night {
   color-scheme: dark;
-  background: #141110;
+  background: #1f1f22;
   color: #f4efe8;
 }
 
 html.appearance-night .home-cards,
 html.appearance-night .shelf {
-  background: #141110;
+  background: #1f1f22;
   color: #f4efe8;
 }
 
@@ -159,7 +159,7 @@ html.appearance-night .dropzone {
 html.appearance-night .folder-form input,
 html.appearance-night .shelf-search,
 html.appearance-night .shelf-sort select,
-html.appearance-night .folder-select-label select,
+html.appearance-night .folder-select,
 html.appearance-night .tag-form input,
 html.appearance-night .menu-field select,
 html.appearance-night .menu-field input {

@@ -19,6 +19,8 @@ const PAD_BOTTOM = 24
 export type CurlHandle = {
   flip: (delta: number) => void
   jumpToPdf: (pdfPage: number) => void
+  /** Turns to the screen page that contains this character. False until the book is ready. */
+  jumpToText: (paragraphId: number, charOffset: number) => boolean
 }
 
 type Props = {
@@ -91,6 +93,16 @@ export const CurlBook = forwardRef<CurlHandle, Props>(function CurlBook(
       anchorRef.current = anchorOf(pagesRef.current[index])
       flipRef.current?.turnToPage(index)
       report(index)
+    },
+    jumpToText(paragraphId: number, charOffset: number) {
+      const pages = pagesRef.current
+      const flip = flipRef.current
+      if (!flip || pages.length === 0) return false
+      const index = pageIndexForAnchor(pages, { paragraphId, charOffset }, pdfPageRef.current)
+      anchorRef.current = anchorOf(pages[index])
+      if (flip.getCurrentPageIndex() !== index) flip.turnToPage(index)
+      report(index)
+      return true
     },
   }))
 

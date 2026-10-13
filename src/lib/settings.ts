@@ -69,6 +69,16 @@ export function saveSettings(settings: ReaderSettings): void {
   window.dispatchEvent(new Event(EVENT))
 }
 
+/** Day and night appearance set the matching reading theme. Sepia stays until the next switch. */
+export function followAppearance(mode: 'day' | 'night', publish: boolean): void {
+  const prev = loadSettings()
+  if (!publish && (prev.theme === 'sepia' || prev.theme === mode)) return
+  if (publish && prev.theme === mode) return
+  const next = { ...prev, theme: mode, updatedAt: publish ? Date.now() : prev.updatedAt }
+  saveSettings(next)
+  if (publish) notifyLocalChange()
+}
+
 /** Fields that follow the reader from device to device. The button position stays local. */
 export function syncedSettings(settings: ReaderSettings) {
   return {

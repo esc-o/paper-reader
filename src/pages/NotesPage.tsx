@@ -64,7 +64,7 @@ function NoteList({ notes, query }: { notes: Annotation[] | null; query: Library
       <ul className="note-list">
         {visible.map((note) => (
           <li key={note.id} className="note-row">
-            <a className="note-link" href={routes.reader(note.bookId)}>
+            <a className="note-link" href={routes.reader(note.bookId, note.id)}>
               <span className="note-kind">
                 <span className={`stat-dot ${note.kind}`} />
                 {t(`home.${note.kind}`)}
