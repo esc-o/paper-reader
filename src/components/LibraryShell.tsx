@@ -37,7 +37,7 @@ export function LibraryShell({
   children: (query: LibraryQuery) => ReactNode
 }) {
   const { t } = useTranslation()
-  const narrow = useNarrow(767)
+  const narrow = useNarrow(1023)
   const [books, setBooks] = useState<Book[] | null>(null)
   const [folders, setFolders] = useState<Folder[]>([])
   const [tags, setTags] = useState<Tag[]>([])

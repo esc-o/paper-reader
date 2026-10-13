@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { TouchEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
-import { isSingleEnglishWord, lookup, LookupError } from '../lib/lookup'
+import { isSingleEnglishWord, lookup, LookupError, translateGloss } from '../lib/lookup'
 import type { LookupResult } from '../lib/lookup'
 
 type State =
@@ -103,7 +103,33 @@ export function LookupPanel({ text, onClose }: { text: string; onClose: () => vo
 }
 
 function LookupContent({ result }: { result: LookupResult }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const bilingual = i18n.language.startsWith('zh')
+  const [glosses, setGlosses] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    if (!bilingual || result.kind !== 'dictionary') return
+    const definitions = result.entry.meanings.flatMap((meaning) =>
+      meaning.definitions.slice(0, 5).map((item) => item.definition),
+    )
+    const unique = [...new Set(definitions.map((text) => text.trim()).filter(Boolean))]
+    const controller = new AbortController()
+    void (async () => {
+      const next: Record<string, string> = {}
+      for (const text of unique) {
+        if (controller.signal.aborted) return
+        try {
+          const gloss = await translateGloss(text, controller.signal)
+          if (gloss && gloss.localeCompare(text, undefined, { sensitivity: 'accent' }) !== 0) next[text] = gloss
+        } catch {
+          // Keep the English line when a gloss cannot be fetched.
+        }
+        if (!controller.signal.aborted) setGlosses({ ...next })
+      }
+    })()
+    return () => controller.abort()
+  }, [bilingual, result])
+
   if (result.kind === 'translation') {
     return (
       <>
@@ -146,6 +172,9 @@ function LookupContent({ result }: { result: LookupResult }) {
             {m.definitions.slice(0, 5).map((d, i) => (
               <li key={i}>
                 {d.definition}
+                {bilingual && glosses[d.definition.trim()] && (
+                  <p className="lookup-gloss">{glosses[d.definition.trim()]}</p>
+                )}
                 {d.example && <p className="lookup-example">“{d.example}”</p>}
               </li>
             ))}

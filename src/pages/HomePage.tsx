@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { SiteChrome } from '../components/SiteChrome'
-import { useAuth } from '../lib/auth'
 import { LIBRARY_EVENT } from '../lib/changes'
 import { countAnnotationsByKind, getReadingSeconds, listBooks, listTags } from '../lib/db'
 import { currentChapter, importStatusText, progressPercent, useImportPdf } from '../lib/library'
 import { routes } from '../lib/router'
+import { useNarrow } from '../lib/useNarrow'
 import { currentWeek, dayKey, formatLastRead } from '../lib/time'
 import type { AnnotationKind, Book, Tag } from '../lib/types'
 import './HomePage.css'
@@ -53,11 +53,12 @@ const STAT_KINDS: ('highlight' | 'underline' | 'comment')[] = ['highlight', 'und
 
 export function HomePage() {
   const { t, i18n } = useTranslation()
-  const { user } = useAuth()
   const [data, setData] = useState<HomeData | null>(null)
   const { state: importState, importFile } = useImportPdf()
   const inputRef = useRef<HTMLInputElement>(null)
   const showEyebrow = i18n.language.startsWith('zh')
+  const phone = useNarrow(767)
+  const compact = useNarrow(1023) && !phone
 
   useEffect(() => {
     const load = () => loadHomeData().then(setData)
@@ -127,78 +128,170 @@ export function HomePage() {
               e.target.value = ''
             }}
           />
+          {compact && <NotesStats counts={data?.counts} showEyebrow={showEyebrow} placement="hero" />}
         </div>
 
         <footer className="hero-footer">
-          {book?.needsFile ? (
-            <>
-              <span className="file-missing">{t('fileMissing.lead')}</span>
-              <span className="file-missing">{t('fileMissing.note')}</span>
-            </>
-          ) : (
-            <>
-              {book?.lastReadAt ? t('home.lastRead', { time: formatLastRead(book.lastReadAt) }) : null}
-              <span className="hero-footer-note">{user ? t('home.savedAccount') : t('home.localOnly')}</span>
-            </>
-          )}
+          {book?.needsFile && <span className="file-missing">{t('fileMissing.lead')}</span>}
+          {book?.lastReadAt && !book.needsFile ? t('home.lastRead', { time: formatLastRead(book.lastReadAt) }) : null}
+          <span className="hero-footer-note">{book ? t('home.savedAccount') : t('home.localOnly')}</span>
         </footer>
       </section>
 
       <section className="home-cards">
-        <article className="card card-progress">
-          <header className="card-head">
-            <span className="card-label">{t('home.progress')}</span>
-            {showEyebrow && <span className="card-label">Progress</span>}
-          </header>
-          <p className="card-number">{percent}%</p>
-          <div className="progress-track">
-            <div className="progress-fill" style={{ width: `${percent}%` }} />
-          </div>
-          <p className="card-sub">{chapter || (book ? t('home.noChapter') : t('home.nothing'))}</p>
-        </article>
+        {phone || compact ? (
+          <RingCard
+            value={percent}
+            center={`${percent}%`}
+            caption={t('home.progress')}
+          />
+        ) : (
+          <article className="card card-progress">
+            <header className="card-head">
+              <span className="card-label">{t('home.progress')}</span>
+              {showEyebrow && <span className="card-label">Progress</span>}
+            </header>
+            <p className="card-number">{percent}%</p>
+            <div className="progress-track">
+              <div className="progress-fill" style={{ width: `${percent}%` }} />
+            </div>
+            <p className="card-sub">{chapter || (book ? t('home.noChapter') : t('home.nothing'))}</p>
+          </article>
+        )}
 
-        <article className="card">
-          <header className="card-head">
-            <span className="card-label">{t('home.week')}</span>
-            {showEyebrow && <span className="card-label">This week</span>}
-          </header>
-          <p className="card-number">
-            {weekTotal}
-            <span className="card-unit">{t('home.minutes')}</span>
-          </p>
-          <div className="week-chart">
-            {week.map((day) => (
-              <div className="week-day" key={day.key} title={t('home.weekTitle', { day: t(`week.${day.key}`), minutes: day.minutes })}>
-                <div className="week-bar-area">
-                  <div
-                    className={`week-bar${day.isToday ? ' today' : ''}${day.isFuture ? ' future' : ''}`}
-                    style={{ height: `${(day.minutes / weekMax) * 100}%` }}
-                  />
+        {phone ? (
+          <article className="card card-week-line">
+            <header className="card-head">
+              <span className="card-label">{t('home.week')}</span>
+              {showEyebrow && <span className="week-pill">Weekly tracker</span>}
+            </header>
+            <WeekLine week={week} />
+          </article>
+        ) : compact ? (
+          <RingCard
+            value={Math.min(100, Math.round((weekTotal / 60) * 100))}
+            center={String(weekTotal)}
+            caption={t('home.minutes')}
+          />
+        ) : (
+          <article className="card">
+            <header className="card-head">
+              <span className="card-label">{t('home.week')}</span>
+              {showEyebrow && <span className="card-label">This week</span>}
+            </header>
+            <p className="card-number">
+              {weekTotal}
+              <span className="card-unit">{t('home.minutes')}</span>
+            </p>
+            <div className="week-chart">
+              {week.map((day) => (
+                <div className="week-day" key={day.key} title={t('home.weekTitle', { day: t(`week.${day.key}`), minutes: day.minutes })}>
+                  <div className="week-bar-area">
+                    <div className="week-bar" style={{ height: `${(day.minutes / weekMax) * 100}%` }} />
+                  </div>
+                  <span className="week-label">{t(`week.${day.key}`)}</span>
                 </div>
-                <span className={`week-label${day.isToday ? ' today' : ''}`}>{t(`week.${day.key}`)}</span>
-              </div>
-            ))}
-          </div>
-        </article>
+              ))}
+            </div>
+          </article>
+        )}
 
-        <article className="card">
-          <header className="card-head">
-            <span className="card-label">{t('home.notes')}</span>
-            {showEyebrow && <span className="card-label">Notes</span>}
-          </header>
-          <div className="stats">
-            {STAT_KINDS.map((kind) => (
-              <div className="stat" key={kind}>
-                <span className="stat-number">{data?.counts[kind] ?? 0}</span>
-                <span className="stat-label">
-                  <span className={`stat-dot ${kind}`} />
-                  {t(`home.${kind}`)}
-                </span>
-              </div>
-            ))}
-          </div>
-        </article>
+        {!compact && <NotesStats counts={data?.counts} showEyebrow={showEyebrow} placement="card" />}
       </section>
     </div>
+  )
+}
+
+function RingCard({ value, center, caption }: { value: number; center: string; caption: string }) {
+  const radius = 42
+  const circumference = 2 * Math.PI * radius
+  const filled = Math.min(100, Math.max(0, value))
+  const offset = circumference * (1 - filled / 100)
+  return (
+    <article className="card card-ring">
+      <div className="ring">
+        <svg viewBox="0 0 120 120" aria-hidden="true">
+          <circle className="ring-track" cx="60" cy="60" r={radius} />
+          <circle
+            className="ring-value"
+            cx="60"
+            cy="60"
+            r={radius}
+            strokeDasharray={circumference}
+            strokeDashoffset={offset}
+          />
+        </svg>
+        <div className="ring-copy">
+          <strong>{center}</strong>
+          <span>{caption}</span>
+        </div>
+      </div>
+    </article>
+  )
+}
+
+function WeekLine({ week }: { week: WeekDay[] }) {
+  const { t } = useTranslation()
+  const width = 280
+  const height = 112
+  const padX = 12
+  const padY = 10
+  const max = Math.max(...week.map((day) => day.minutes), 1)
+  const points = week.map((day, index) => {
+    const x = padX + (index * (width - padX * 2)) / Math.max(week.length - 1, 1)
+    const y = height - padY - (day.minutes / max) * (height - padY * 2)
+    return { x, y, day }
+  })
+  const path = points.map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x} ${point.y}`).join(' ')
+  return (
+    <div className="week-line">
+      <svg viewBox={`0 0 ${width} ${height}`} role="img">
+        {[0.28, 0.52, 0.76].map((row) => (
+          <line key={row} className="week-grid" x1="0" x2={width} y1={height * row} y2={height * row} />
+        ))}
+        <path className="week-stroke" d={path} />
+        {points.map((point) => (
+          <circle key={point.day.key} className="week-dot" cx={point.x} cy={point.y} r="3.5" />
+        ))}
+      </svg>
+      <div className="week-line-labels">
+        {week.map((day) => (
+          <span key={day.key} title={t('home.weekTitle', { day: t(`week.${day.key}`), minutes: day.minutes })}>
+            {t(`week.${day.key}`)}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function NotesStats({
+  counts,
+  showEyebrow,
+  placement,
+}: {
+  counts?: Record<AnnotationKind, number>
+  showEyebrow: boolean
+  placement: 'hero' | 'card'
+}) {
+  const { t } = useTranslation()
+  return (
+    <article className={placement === 'hero' ? 'hero-notes' : 'card'}>
+      <header className="card-head">
+        <span className="card-label">{t('home.notes')}</span>
+        {showEyebrow && <span className={placement === 'hero' ? 'week-pill' : 'card-label'}>Notes</span>}
+      </header>
+      <div className="stats">
+        {STAT_KINDS.map((kind) => (
+          <div className="stat" key={kind}>
+            <span className="stat-number">{counts?.[kind] ?? 0}</span>
+            <span className="stat-label">
+              <span className={`stat-dot ${kind}`} />
+              {t(`home.${kind}`)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </article>
   )
 }

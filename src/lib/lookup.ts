@@ -239,3 +239,40 @@ async function translate(
   const decoded = new DOMParser().parseFromString(translated, 'text/html').documentElement.textContent
   return { kind: 'translation', source: query, translated: decoded ?? translated, truncated }
 }
+
+const GLOSS_KEY = 'paper-reader.gloss'
+
+function readGloss(text: string): string | null {
+  try {
+    const all = JSON.parse(localStorage.getItem(GLOSS_KEY) || '{}') as Record<string, string>
+    return all[text] ?? null
+  } catch {
+    return null
+  }
+}
+
+function writeGloss(text: string, gloss: string): void {
+  try {
+    const all = JSON.parse(localStorage.getItem(GLOSS_KEY) || '{}') as Record<string, string>
+    if (!Object.prototype.hasOwnProperty.call(all, text) && Object.keys(all).length >= CACHE_LIMIT) {
+      const oldest = Object.keys(all)[0]
+      if (oldest) delete all[oldest]
+    }
+    all[text] = gloss
+    localStorage.setItem(GLOSS_KEY, JSON.stringify(all))
+  } catch {
+    // A full localStorage should not hide the English definition.
+  }
+}
+
+/** Chinese gloss for one English definition. Cached in this browser. */
+export async function translateGloss(text: string, signal: AbortSignal): Promise<string> {
+  const source = text.replace(/\s+/g, ' ').trim()
+  if (!source) return ''
+  const cached = readGloss(source)
+  if (cached) return cached
+  const result = await translate(source, signal)
+  const gloss = result.translated.trim()
+  if (gloss) writeGloss(source, gloss)
+  return gloss
+}

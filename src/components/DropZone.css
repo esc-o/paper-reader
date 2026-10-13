@@ -3,7 +3,7 @@
   max-width: 100%;
   padding: 36px 20px;
   border: 1.5px dashed #cfc6b8;
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   text-align: center;
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;

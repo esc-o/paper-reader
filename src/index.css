@@ -21,6 +21,10 @@
   --sw-pink: #f783ac;
   --sw-blue: #74c0fc;
 
+  /* Login control is a pill. Cards use half of its 32px height. */
+  --radius-button: 999px;
+  --radius-card: calc(32px / 2);
+
   font-family: 'Inter Variable', Inter, system-ui, -apple-system, 'Segoe UI', 'PingFang SC',
     'Microsoft YaHei', sans-serif;
   font-size: 16px;
@@ -89,8 +93,37 @@ html.appearance-night .progress-track {
   background: rgba(255, 255, 255, 0.12);
 }
 
-html.appearance-night .progress-fill {
+html.appearance-night .progress-fill,
+html.appearance-night .week-bar,
+html.appearance-night .week-stroke,
+html.appearance-night .week-dot {
   background: #f4efe8;
+  stroke: #f4efe8;
+  fill: #f4efe8;
+}
+
+html.appearance-night .week-stroke {
+  fill: none;
+}
+
+html.appearance-night .week-grid {
+  stroke: rgba(255, 255, 255, 0.14);
+}
+
+html.appearance-night .ring-track {
+  stroke: #3a322e;
+}
+
+html.appearance-night .ring-value {
+  stroke: #69db7c;
+}
+
+html.appearance-night .ring-copy strong {
+  color: #f4efe8;
+}
+
+html.appearance-night .card-ring {
+  background: transparent;
 }
 
 html.appearance-night .book-row,

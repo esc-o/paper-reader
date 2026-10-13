@@ -104,7 +104,7 @@
   display: inline-block;
   margin-top: 16px;
   padding: 10px 16px;
-  border-radius: 999px;
+  border-radius: var(--radius-button);
   background: var(--reader-text, var(--ink));
   color: var(--reader-bg, var(--cream));
   font-weight: 700;
@@ -296,7 +296,7 @@ h3.paragraph-text {
   gap: 2px;
   max-width: calc(100vw - 16px);
   padding: 6px;
-  border-radius: 10px;
+  border-radius: var(--radius-card);
   background: var(--ink);
   color: #fff;
   box-shadow: 0 10px 30px rgba(43, 34, 32, 0.3);
@@ -324,7 +324,7 @@ h3.paragraph-text {
 .toolbar-button {
   padding: 6px 10px;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-button);
   background: transparent;
   color: inherit;
   font: inherit;
@@ -374,7 +374,7 @@ h3.paragraph-text {
 .popover {
   padding: 14px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--radius-card);
   background: #fff;
   color: var(--ink);
   box-shadow: 0 14px 40px rgba(43, 34, 32, 0.18);
@@ -414,7 +414,7 @@ h3.paragraph-text {
   box-sizing: border-box;
   padding: 10px;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--radius-button);
   background: var(--cream);
   color: var(--ink);
   font: inherit;
@@ -437,7 +437,7 @@ h3.paragraph-text {
 .text-button,
 .solid-button {
   padding: 7px 12px;
-  border-radius: 6px;
+  border-radius: var(--radius-button);
   font: inherit;
   font-size: 13px;
   font-weight: 600;
@@ -500,9 +500,51 @@ h3.paragraph-text {
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
-  background: #fff;
+  background: #fffdf9;
   color: var(--ink);
+  border-color: var(--line);
   box-shadow: 0 0 40px rgba(43, 34, 32, 0.15);
+}
+
+html.appearance-night .lookup-panel {
+  background: #1c1816;
+  color: #f4efe8;
+  border-color: #3a322e;
+  box-shadow: none;
+}
+
+html.appearance-night .lookup-panel .card-label,
+html.appearance-night .lookup-phonetics,
+html.appearance-night .lookup-example,
+html.appearance-night .lookup-original,
+html.appearance-night .lookup-note,
+html.appearance-night .lookup-source,
+html.appearance-night .lookup-gloss {
+  color: #b7aea8;
+}
+
+html.appearance-night .lookup-panel .lookup-word,
+html.appearance-night .lookup-panel .lookup-translation,
+html.appearance-night .lookup-panel .lookup-pos,
+html.appearance-night .lookup-panel .icon-button {
+  color: #f4efe8;
+}
+
+html.appearance-night .lookup-panel .icon-button:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+html.appearance-night .lookup-meaning {
+  border-top: 1px solid #3a322e;
+}
+
+html.appearance-night .lookup-panel .sheet-handle {
+  background: #3a322e;
+}
+
+html.appearance-night .lookup-note.error {
+  color: #ff8a8a;
 }
 
 .sheet-handle {
@@ -532,6 +574,10 @@ h3.paragraph-text {
     border-left: 1px solid var(--line);
     animation: panel-in-right 0.2s ease-out;
   }
+
+  html.appearance-night .lookup-panel {
+    border-left-color: #3a322e;
+  }
 }
 
 @media (max-width: 899px) {
@@ -540,7 +586,7 @@ h3.paragraph-text {
     right: 0;
     bottom: 0;
     height: 50vh;
-    border-radius: 16px 16px 0 0;
+    border-radius: var(--radius-card) var(--radius-card) 0 0;
     animation: panel-in-up 0.22s ease-out;
     transition: transform 0.2s ease-out;
   }
@@ -642,6 +688,18 @@ h3.paragraph-text {
   margin: 2px 0 0;
   color: var(--muted);
   font-size: 14px;
+}
+
+.lookup-gloss {
+  margin: 2px 0 0;
+  color: var(--accent-ink);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.lookup-meaning + .lookup-meaning {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
 }
 
 .lookup-original {
