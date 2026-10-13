@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, MouseEvent as ReactMouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
-import { TopActions } from '../components/TopActions'
+import { SiteChrome } from '../components/SiteChrome'
 import { LIBRARY_EVENT } from '../lib/changes'
 import { deleteAnnotation, getBook, listAnnotations, saveAnnotation, saveBook, saveProgress } from '../lib/db'
 import { familyFor, useFonts } from '../lib/fonts'
@@ -384,17 +384,18 @@ export function ReaderPage({ bookId }: { bookId: string }) {
       } as CSSProperties}
       onClick={onReaderClick}
     >
+      <SiteChrome />
       <header className="reader-bar">
         <a className="reader-back" href={routes.home}>{t('nav.backHome')}</a>
         <span className="reader-title" title={book.title}>{book.title}</span>
         <span className="reader-page-count">{page} / {book.numPages}</span>
-        <TopActions />
       </header>
 
       <div className="reader-content" ref={contentRef}>
         {book.needsFile ? (
           <div className="reimport">
-            <p>{t('reader.reimport')}</p>
+            <p>{t('fileMissing.lead')}</p>
+            <p>{t('fileMissing.note')}</p>
             <label className="solid-button reimport-button">
               {reimporting ? t('errors.opening') : t('reader.reimportButton')}
               <input

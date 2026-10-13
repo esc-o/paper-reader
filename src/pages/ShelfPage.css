@@ -3,55 +3,6 @@
   background: var(--cream);
 }
 
-.shelf-bar {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  max-width: 100%;
-  padding: 16px 24px;
-  font-size: 14px;
-}
-
-.shelf-bar-top {
-  display: flex;
-  align-items: center;
-  margin-left: auto;
-  min-width: 0;
-}
-
-.site-brand {
-  display: none;
-  color: var(--ink);
-  font-weight: 700;
-  text-decoration: none;
-}
-
-.shelf-links {
-  display: flex;
-  align-items: center;
-  order: -1;
-  gap: 16px;
-  min-width: 0;
-}
-
-.shelf-links a,
-.shelf-bar a {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 650;
-  letter-spacing: 0.14em;
-  text-decoration: none;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-.shelf-links a.active,
-.shelf-links a:hover,
-.shelf-bar a.active,
-.shelf-bar a:hover {
-  color: var(--ink);
-}
-
 .shelf {
   overflow-x: hidden;
 }
@@ -179,16 +130,16 @@
 }
 
 .book-menu {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 4px);
-  z-index: 5;
+  position: fixed;
+  z-index: 40;
   min-width: 128px;
+  max-height: calc(100svh - 16px);
   padding: 6px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fffdf9;
   box-shadow: 0 10px 30px rgba(43, 34, 32, 0.12);
+  overflow: auto;
 }
 
 .book-menu button {
@@ -215,8 +166,6 @@
 
 .book-menu {
   min-width: 220px;
-  max-height: 70vh;
-  overflow: auto;
 }
 
 .folder-pane .card-label {
@@ -240,7 +189,6 @@
 
 .folder-list > button,
 .folder-row > button:first-child,
-.folder-add,
 .folder-mobile-actions > button {
   padding: 7px 8px;
   border: 0;
@@ -273,6 +221,25 @@
 
 .folder-mini.danger {
   color: #c92a2a;
+}
+
+.folder-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  margin-top: 4px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.folder-add:hover {
+  background: rgba(43, 34, 32, 0.06);
 }
 
 .folder-form input,
@@ -308,17 +275,20 @@
 }
 
 .shelf-tools {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 180px;
   gap: 10px;
+  align-items: end;
   margin-top: 18px;
 }
 
-.shelf-search {
-  flex: 1;
+.shelf-search,
+.shelf-sort select {
+  height: 40px;
 }
 
 .shelf-sort {
-  width: 160px;
+  width: auto;
   margin: 0;
 }
 
@@ -441,36 +411,46 @@
   font-weight: 500;
 }
 
-@media (max-width: 860px) {
-  .shelf-bar {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 10px;
-    padding: 14px 16px 8px;
-  }
-  .shelf-bar-top {
-    order: -1;
-    margin-left: 0;
-    justify-content: space-between;
-    gap: 12px;
-  }
-  .shelf-links {
-    order: 0;
-  }
-  .site-brand {
-    display: block;
-  }
+@media (min-width: 768px) {
   .shelf-body {
-    grid-template-columns: minmax(0, 1fr);
+    display: block;
+    max-width: none;
+    margin: 0;
+    padding: 0 0 64px;
+  }
+
+  .folder-pane {
+    position: fixed;
+    z-index: 4;
+    top: 68px;
+    left: 24px;
+    width: 200px;
+    max-height: calc(100svh - 84px);
+    overflow: auto;
+  }
+
+  .shelf-body .shelf-main {
+    --main-width: 720px;
+    --side-clear: 256px;
+    width: min(var(--main-width), calc(100vw - var(--side-clear) - 24px));
+    max-width: none;
+    margin-top: 0;
+    margin-right: 0;
+    margin-left: max(calc(50vw - var(--main-width) / 2), var(--side-clear));
+    margin-right: 24px;
+    padding: 16px 0 0;
+  }
+}
+
+@media (max-width: 767px) {
+  .shelf-body {
+    display: block;
     padding: 8px 16px 48px;
   }
   .shelf > .shelf-main {
     padding: 8px 16px 48px;
   }
   .shelf-tools {
-    flex-direction: column;
-  }
-  .shelf-sort {
-    width: 100%;
+    grid-template-columns: 1fr;
   }
 }

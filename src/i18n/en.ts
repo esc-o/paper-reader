@@ -48,7 +48,10 @@ const en: Dictionary = {
     highlight: 'Highlights',
     underline: 'Underlines',
     comment: 'Comments',
-    reimport: 'This PDF is not on this device yet. Import it again and your progress and notes will match.',
+  },
+  fileMissing: {
+    lead: "This PDF isn't on this device yet. Re-import it to restore your progress and annotations.",
+    note: 'Progress and notes sync to your account. The PDF stays on this device.',
   },
   week: {
     mon: 'M',
@@ -63,6 +66,7 @@ const en: Dictionary = {
     kicker: 'Notes',
     title: 'Notes',
     empty: 'No highlights, underlines, or comments yet.',
+    noMatch: 'No notes match.',
     inBook: 'From {{title}}',
   },
   shelf: {
@@ -113,7 +117,6 @@ const en: Dictionary = {
     pager: 'Page {{page}} / {{total}}',
     tocHidden: 'This page is the table of contents, so it is hidden. Open the menu to see it.',
     noText: 'No text on this page (it may be a figure).',
-    reimport: 'Import this PDF again on this device. Progress and notes are matched by the file fingerprint.',
     reimportButton: 'Choose PDF',
     emptyBook: 'There is no body text to lay out.',
     importFailed: 'Could not import that PDF. Try another file.',

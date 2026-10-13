@@ -46,7 +46,10 @@ const zh = {
     highlight: '高亮',
     underline: '划线',
     comment: '评论',
-    reimport: '这篇 PDF 还没在这台设备上。请重新导入，进度和标注会自动对上。',
+  },
+  fileMissing: {
+    lead: '本设备上还没有这篇 PDF，重新导入即可恢复进度和标注。',
+    note: '进度和笔记会同步到账号，PDF 只保存在本地。',
   },
   week: {
     mon: '一',
@@ -61,6 +64,7 @@ const zh = {
     kicker: 'Notes',
     title: '笔记',
     empty: '还没有高亮、划线或评论。',
+    noMatch: '没有符合条件的笔记。',
     inBook: '来自《{{title}}》',
   },
   shelf: {
@@ -111,7 +115,6 @@ const zh = {
     pager: '第 {{page}} / {{total}} 页',
     tocHidden: '这一页是目录，已收起。可以在菜单里查看。',
     noText: '这一页没有可提取的文字（可能是图表页）。',
-    reimport: '请在这台设备上重新导入这个 PDF。导入后会按文件指纹对上原来的进度和标注。',
     reimportButton: '选择 PDF',
     emptyBook: '没有可排版的正文。',
     importFailed: '导入失败，请换一个 PDF 试试。',

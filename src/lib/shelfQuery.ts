@@ -13,26 +13,25 @@ export function bookYear(book: Book): number | null {
   return typeof book.year === 'number' ? book.year : yearInTitle(book.title)
 }
 
-export function filterShelf(
-  books: Book[],
-  tags: Tag[],
-  options: { folder: FolderChoice; tagIds: string[]; query: string; sort: ShelfSort },
-): Book[] {
+export type ShelfFilter = { folder: FolderChoice; tagIds: string[]; query: string; sort: ShelfSort }
+
+export function bookMatches(book: Book, tags: Tag[], options: ShelfFilter): boolean {
   const needle = options.query.trim().toLowerCase()
   const selected = new Set(options.tagIds)
+  if (options.folder === 'none' && book.folderId) return false
+  if (options.folder !== 'all' && options.folder !== 'none' && book.folderId !== options.folder) return false
+  if (selected.size > 0 && !(book.tagIds ?? []).some((id) => selected.has(id))) return false
+  if (!needle) return true
   const names = new Map(tags.map((tag) => [tag.id, tag.name.toLowerCase()]))
-  const matched = books.filter((book) => {
-    if (options.folder === 'none' && book.folderId) return false
-    if (options.folder !== 'all' && options.folder !== 'none' && book.folderId !== options.folder) return false
-    if (selected.size > 0 && !(book.tagIds ?? []).some((id) => selected.has(id))) return false
-    if (!needle) return true
-    const tagText = (book.tagIds ?? []).map((id) => names.get(id) ?? '').join(' ')
-    return [book.title, book.author, tagText].join('\n').toLowerCase().includes(needle)
-  })
-  return matched.sort((a, b) => compareBooks(a, b, options.sort))
+  const tagText = (book.tagIds ?? []).map((id) => names.get(id) ?? '').join(' ')
+  return [book.title, book.author, tagText].join('\n').toLowerCase().includes(needle)
 }
 
-function compareBooks(a: Book, b: Book, sort: ShelfSort): number {
+export function filterShelf(books: Book[], tags: Tag[], options: ShelfFilter): Book[] {
+  return books.filter((book) => bookMatches(book, tags, options)).sort((a, b) => compareBooks(a, b, options.sort))
+}
+
+export function compareBooks(a: Book, b: Book, sort: ShelfSort): number {
   if (sort === 'title') return a.title.localeCompare(b.title, undefined, { sensitivity: 'base' })
   if (sort === 'added') return b.addedAt - a.addedAt
   if (sort === 'year') {

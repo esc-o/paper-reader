@@ -68,16 +68,6 @@ html.appearance-night .note-text {
   color: #f4efe8;
 }
 
-html.appearance-night .shelf-links a,
-html.appearance-night .shelf-bar a {
-  color: #b7aea8;
-}
-
-html.appearance-night .shelf-bar .site-brand,
-html.appearance-night .shelf-links a.active,
-html.appearance-night .shelf-links a:hover,
-html.appearance-night .shelf-bar a.active,
-html.appearance-night .shelf-bar a:hover,
 html.appearance-night .week-label.today {
   color: #f4efe8;
 }
@@ -155,6 +145,7 @@ html.appearance-night .menu-tags button.on {
 
 html.appearance-night .tag-chip,
 html.appearance-night .tag-add,
+html.appearance-night .folder-add,
 html.appearance-night .menu-tags button {
   color: #f4efe8;
   border-color: #3a322e;
@@ -162,12 +153,6 @@ html.appearance-night .menu-tags button {
 
 html.appearance-night .stat-dot.comment {
   background: #f4efe8;
-}
-
-@media (min-width: 861px) {
-  html.appearance-night .home-corner {
-    color: #f4efe8;
-  }
 }
 
 .card-label {

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { TopActions } from '../components/TopActions'
+import { SiteChrome } from '../components/SiteChrome'
 import { useAuth } from '../lib/auth'
 import { LIBRARY_EVENT } from '../lib/changes'
 import { countAnnotationsByKind, getReadingSeconds, listBooks, listTags } from '../lib/db'
@@ -80,21 +80,8 @@ export function HomePage() {
 
   return (
     <div className="home">
+      <SiteChrome active="home" showBrand />
       <section className="home-hero">
-        <nav className="home-nav">
-          <div className="home-nav-top">
-            <span className="home-brand">Paper Reader</span>
-            <div className="home-corner">
-              <TopActions tone="light" />
-            </div>
-          </div>
-          <div className="home-nav-links">
-            <a href={routes.home} className="active">{t('nav.home')}</a>
-            <a href={routes.shelf}>{t('nav.shelf')}</a>
-            <a href={routes.notes}>{t('nav.notes')}</a>
-          </div>
-        </nav>
-
         <div className="hero-main">
           <p className="hero-status">
             <span className="status-dot" />
@@ -143,12 +130,17 @@ export function HomePage() {
         </div>
 
         <footer className="hero-footer">
-          {book?.needsFile
-            ? t('home.reimport')
-            : book?.lastReadAt
-              ? t('home.lastRead', { time: formatLastRead(book.lastReadAt) })
-              : null}
-          <span className="hero-footer-note">{user ? t('home.savedAccount') : t('home.localOnly')}</span>
+          {book?.needsFile ? (
+            <>
+              <span className="file-missing">{t('fileMissing.lead')}</span>
+              <span className="file-missing">{t('fileMissing.note')}</span>
+            </>
+          ) : (
+            <>
+              {book?.lastReadAt ? t('home.lastRead', { time: formatLastRead(book.lastReadAt) }) : null}
+              <span className="hero-footer-note">{user ? t('home.savedAccount') : t('home.localOnly')}</span>
+            </>
+          )}
         </footer>
       </section>
 
