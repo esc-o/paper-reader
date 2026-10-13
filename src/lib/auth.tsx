@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import i18n from '../i18n'
 import { onLocalChange } from './changes'
-import { supabase } from './supabase'
+import { supabase, supabaseAnonKey } from './supabase'
 import { syncNow } from './sync'
 
 type AuthValue = {
@@ -62,11 +62,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return
     }
     setError(null)
-    const { error: authError } = await supabase.auth.signInWithOAuth({
+    const { data, error: authError } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}${window.location.pathname}` },
+      options: {
+        redirectTo: `${window.location.origin}${window.location.pathname}`,
+        skipBrowserRedirect: true,
+      },
     })
-    if (authError) setError(authError.message || i18n.t('auth.failed'))
+    if (authError || !data.url) {
+      setError(authError?.message || i18n.t('auth.failed'))
+      return
+    }
+    const next = new URL(data.url)
+    next.searchParams.set('apikey', supabaseAnonKey)
+    window.location.assign(next.toString())
   }, [])
 
   const signOut = useCallback(async () => {
