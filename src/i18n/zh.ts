@@ -64,6 +64,7 @@ const zh = {
     title: '笔记',
     empty: '还没有高亮、划线或评论。',
     noMatch: '没有符合条件的笔记。',
+    filter: '按类型筛选',
     inBook: '来自《{{title}}》',
   },
   shelf: {

@@ -67,6 +67,7 @@ const en: Dictionary = {
     title: 'Notes',
     empty: 'No highlights, underlines, or comments yet.',
     noMatch: 'No notes match.',
+    filter: 'Filter by type',
     inBook: 'From {{title}}',
   },
   shelf: {

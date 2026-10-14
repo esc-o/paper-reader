@@ -6,9 +6,11 @@ import { LIBRARY_EVENT } from '../lib/changes'
 import { listAllAnnotations } from '../lib/db'
 import { routes } from '../lib/router'
 import { bookMatches, compareBooks } from '../lib/shelfQuery'
-import type { Annotation } from '../lib/types'
+import type { Annotation, AnnotationKind } from '../lib/types'
 import './ShelfPage.css'
 import './NotesPage.css'
+
+const KINDS: AnnotationKind[] = ['highlight', 'underline', 'comment']
 
 export function NotesPage() {
   const { t } = useTranslation()
@@ -30,10 +32,12 @@ export function NotesPage() {
 
 function NoteList({ notes, query }: { notes: Annotation[] | null; query: LibraryQuery }) {
   const { t } = useTranslation()
+  const [kinds, setKinds] = useState<AnnotationKind[]>([])
   const books = new Map((query.books ?? []).map((book) => [book.id, book]))
   const needle = query.query.trim().toLowerCase()
   const visible = (notes ?? [])
     .filter((note) => {
+      if (kinds.length > 0 && !kinds.includes(note.kind)) return false
       const book = books.get(note.bookId)
       if (!book) return query.folderChoice === 'all' && query.activeTags.length === 0 && !needle
       const structural = bookMatches(book, query.tags, {
@@ -57,8 +61,25 @@ function NoteList({ notes, query }: { notes: Annotation[] | null; query: Library
       return b.updatedAt - a.updatedAt
     })
 
+  function toggleKind(kind: AnnotationKind) {
+    setKinds((current) => (current.includes(kind) ? current.filter((item) => item !== kind) : [...current, kind]))
+  }
+
   return (
     <>
+      {notes && notes.length > 0 && (
+        <div className="note-kinds" role="group" aria-label={t('notesPage.filter')}>
+          {KINDS.map((kind) => {
+            const on = kinds.includes(kind)
+            return (
+              <button key={kind} type="button" className={`tag-chip${on ? ' on' : ''}`} aria-pressed={on} onClick={() => toggleKind(kind)}>
+                <span className={`stat-dot ${kind}`} />
+                {t(`toolbar.${kind}`)}
+              </button>
+            )
+          })}
+        </div>
+      )}
       {notes && notes.length === 0 && <p className="shelf-empty">{t('notesPage.empty')}</p>}
       {notes && notes.length > 0 && visible.length === 0 && <p className="shelf-empty">{t('notesPage.noMatch')}</p>}
       <ul className="note-list">

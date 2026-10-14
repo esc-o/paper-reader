@@ -1,3 +1,52 @@
+.note-kinds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.note-kinds .stat-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex: none;
+}
+
+.note-kinds .stat-dot.highlight {
+  background: var(--sw-yellow);
+}
+
+.note-kinds .stat-dot.underline {
+  height: 2px;
+  background: var(--ul-blue);
+}
+
+.note-kinds .stat-dot.comment {
+  border-radius: 50%;
+  background: var(--chocolate);
+}
+
+.note-kind .stat-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex: none;
+}
+
+.note-kind .stat-dot.highlight {
+  background: var(--sw-yellow);
+}
+
+.note-kind .stat-dot.underline {
+  height: 2px;
+  background: var(--ul-blue);
+}
+
+.note-kind .stat-dot.comment {
+  border-radius: 50%;
+  background: var(--chocolate);
+}
+
 .note-list {
   margin: 8px 0 0;
   padding: 0;
