@@ -414,7 +414,7 @@ h3.paragraph-text {
   box-sizing: border-box;
   padding: 10px;
   border: 1px solid var(--line);
-  border-radius: var(--radius-button);
+  border-radius: 8px;
   background: var(--cream);
   color: var(--ink);
   font: inherit;
