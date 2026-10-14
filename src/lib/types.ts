@@ -14,6 +14,8 @@ export type Book = {
   toc?: TocEntry[]
   /** Printed page minus PDF page. 0 until a contents page can be matched to headings. */
   pageOffset?: number
+  /** Which text extractor built `paragraphs`. Missing means an older import. */
+  textVersion?: number
   addedAt: number
   lastReadAt: number | null
   currentPage: number

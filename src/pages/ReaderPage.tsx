@@ -6,6 +6,7 @@ import { LIBRARY_EVENT } from '../lib/changes'
 import { deleteAnnotation, getBook, listAnnotations, saveAnnotation, saveBook, saveProgress } from '../lib/db'
 import { familyFor, useFonts } from '../lib/fonts'
 import { importPdf, prepareBook } from '../lib/library'
+import { useLookups, type LookedUpWord } from '../lib/lookup'
 import { routes } from '../lib/router'
 import { useStoredSettings } from '../lib/settings'
 import { displayPage } from '../lib/toc'
@@ -39,6 +40,7 @@ export function ReaderPage({ bookId, noteId }: { bookId: string; noteId?: string
   const [selection, setSelection] = useState<PendingSelection | null>(null)
   const [popover, setPopover] = useState<Popover | null>(null)
   const [lookupText, setLookupText] = useState<string | null>(null)
+  const lookedUp = useLookups()
   const [menuOpen, setMenuOpen] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
   const [settings, updateSettings] = useStoredSettings()
@@ -318,6 +320,61 @@ export function ReaderPage({ bookId, noteId }: { bookId: string; noteId?: string
   }, [])
 
   useEffect(() => {
+    const tip = document.createElement('div')
+    tip.className = 'lookup-hover'
+    tip.hidden = true
+    document.body.append(tip)
+    let current: HTMLElement | null = null
+
+    const hide = () => {
+      current = null
+      tip.hidden = true
+    }
+    const show = (word: HTMLElement) => {
+      const gloss = word.dataset.gloss?.trim()
+      if (!gloss) {
+        hide()
+        return
+      }
+      current = word
+      tip.textContent = gloss
+      tip.hidden = false
+      const wordBox = word.getBoundingClientRect()
+      const tipBox = tip.getBoundingClientRect()
+      let top = wordBox.top - tipBox.height - 8
+      if (top < 8) top = wordBox.bottom + 8
+      let left = wordBox.left
+      const maxLeft = window.innerWidth - tipBox.width - 8
+      if (left > maxLeft) left = Math.max(8, maxLeft)
+      tip.style.top = `${top}px`
+      tip.style.left = `${left}px`
+    }
+    const onOver = (event: Event) => {
+      const target = event.target
+      if (!(target instanceof Element)) return
+      const word = target.closest<HTMLElement>('.looked-up')
+      if (!word || !contentRef.current?.contains(word)) {
+        if (current && !(target instanceof Node && current.contains(target))) hide()
+        return
+      }
+      if (word !== current) show(word)
+    }
+    const onOut = (event: Event) => {
+      if (!current) return
+      const next = (event as MouseEvent).relatedTarget
+      if (next instanceof Node && current.contains(next)) return
+      hide()
+    }
+    document.addEventListener('pointerover', onOver)
+    document.addEventListener('pointerout', onOut)
+    return () => {
+      document.removeEventListener('pointerover', onOver)
+      document.removeEventListener('pointerout', onOut)
+      tip.remove()
+    }
+  }, [])
+
+  useEffect(() => {
     if (!noteId || !book || book.needsFile) return
     const note = annotations.find((item) => item.id === noteId)
     const range = note?.ranges[0]
@@ -491,6 +548,7 @@ export function ReaderPage({ bookId, noteId }: { bookId: string; noteId?: string
             lineHeight={settings.lineHeight}
             fontFamily={fontFamily}
             annotations={annotations}
+            lookups={lookedUp}
             onMarksClick={openMarks}
             onCommentClick={openComment}
             onPdfPage={onCurlPage}
@@ -503,6 +561,7 @@ export function ReaderPage({ bookId, noteId }: { bookId: string; noteId?: string
               pageNumber={pageNumber}
               turn={turn}
               annotationsByParagraph={annotationsByParagraph}
+              lookups={lookedUp}
               onMarksClick={openMarks}
               onCommentClick={openComment}
             />
@@ -607,6 +666,7 @@ function PageSection({
   pageNumber,
   turn,
   annotationsByParagraph,
+  lookups,
   onMarksClick,
   onCommentClick,
 }: {
@@ -614,6 +674,7 @@ function PageSection({
   pageNumber: number
   turn: 1 | -1 | 0
   annotationsByParagraph: Map<number, Annotation[]>
+  lookups: LookedUpWord[]
   onMarksClick: (ids: string[], anchor: Anchor) => void
   onCommentClick: (id: string, anchor: Anchor) => void
 }) {
@@ -635,6 +696,7 @@ function PageSection({
           key={paragraph.id}
           paragraph={paragraph}
           annotations={annotationsByParagraph.get(paragraph.id) ?? NO_ANNOTATIONS}
+          lookups={lookups}
           onMarksClick={onMarksClick}
           onCommentClick={onCommentClick}
         />

@@ -23,7 +23,7 @@ type Options = {
 
 /** Splits body text into screen-sized pages using the reader's current type. */
 export function paginateParagraphs(paragraphs: Paragraph[], options: Options): ScreenPage[] {
-  const visible = paragraphs.filter((paragraph) => !paragraph.isToc && paragraph.text.length > 0)
+  const visible = paragraphs.filter((paragraph) => !paragraph.isToc && (paragraph.text.length > 0 || paragraph.image))
   const measurer = document.createElement('div')
   measurer.setAttribute('aria-hidden', 'true')
   measurer.style.cssText = `position:absolute;visibility:hidden;pointer-events:none;left:0;top:0;width:${options.contentWidth}px;z-index:-1;`
@@ -66,6 +66,14 @@ export function paginateParagraphs(paragraphs: Paragraph[], options: Options): S
 
   try {
     for (const paragraph of visible) {
+      if (paragraph.image) {
+        const height = imageHeight(paragraph, options.contentWidth, limit)
+        if (slices.length > 0 && height > limit - used) flush()
+        slices.push({ paragraph, start: 0, end: 0 })
+        used += height
+        if (used >= limit - 1) flush()
+        continue
+      }
       let cursor = 0
       const full = paragraph.text
       while (cursor < full.length) {
@@ -92,6 +100,13 @@ export function paginateParagraphs(paragraphs: Paragraph[], options: Options): S
 
   if (pages.length === 0) pages.push({ slices: [] })
   return pages
+}
+
+function imageHeight(paragraph: Paragraph, contentWidth: number, pageLimit: number): number {
+  const width = paragraph.imageWidth || contentWidth
+  const height = paragraph.imageHeight || contentWidth
+  const displayWidth = Math.min(contentWidth, width)
+  return Math.min(pageLimit, displayWidth * (height / width) + 36)
 }
 
 function fitEnd(

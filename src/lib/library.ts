@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import i18n from '../i18n'
-import { extractPdf, ExtractionError } from '../pdf/extractParagraphs'
+import { extractPdf, ExtractionError, TEXT_VERSION } from '../pdf/extractParagraphs'
 import type { Paragraph } from '../pdf/extractParagraphs'
 import { authorsForDoi, doiInText, usableAuthor } from './authors'
 import { notifyLibrary } from './changes'
@@ -24,7 +24,8 @@ export async function importPdf(
   // Hash before parsing: PDF.js transfers the buffer to its worker and detaches it.
   const id = await sha256(buffer)
   const existing = await getBook(id)
-  if (existing && !existing.needsFile && existing.paragraphs.length > 0) return id
+  const extracted = (existing?.textVersion ?? 0) >= TEXT_VERSION
+  if (existing && !existing.needsFile && existing.paragraphs.length > 0 && extracted) return id
 
   const pdf = await extractPdf(new Uint8Array(buffer), onProgress)
   const now = Date.now()
@@ -41,13 +42,14 @@ export async function importPdf(
   await saveBook({
     id,
     fileName: file.name,
-    title,
+    title: existing?.title || title,
     author,
     description: existing?.description || findDescription(pdf.paragraphs),
     numPages: pdf.numPages,
     paragraphs: pdf.paragraphs,
     toc: pdf.toc,
     pageOffset: pdf.pageOffset,
+    textVersion: TEXT_VERSION,
     addedAt: existing?.addedAt ?? now,
     lastReadAt: existing?.lastReadAt ?? null,
     currentPage: existing && existing.currentPage <= pdf.numPages ? existing.currentPage : 1,

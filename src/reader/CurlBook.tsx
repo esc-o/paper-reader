@@ -4,6 +4,7 @@ import { flushSync } from 'react-dom'
 import { createRoot } from 'react-dom/client'
 import { useTranslation } from 'react-i18next'
 import { PageFlip } from 'page-flip/dist/js/page-flip.module.js'
+import type { LookedUpWord } from '../lib/lookup'
 import type { Paragraph } from '../pdf/extractParagraphs'
 import type { Annotation } from '../lib/types'
 import { AnnotatedParagraph } from './AnnotatedParagraph'
@@ -31,6 +32,7 @@ type Props = {
   lineHeight: number
   fontFamily: string | null
   annotations: Annotation[]
+  lookups?: LookedUpWord[]
   onMarksClick: (ids: string[], anchor: Anchor) => void
   onCommentClick: (id: string, anchor: Anchor) => void
   onPdfPage: (pdfPage: number) => void
@@ -45,6 +47,7 @@ export const CurlBook = forwardRef<CurlHandle, Props>(function CurlBook(
     lineHeight,
     fontFamily,
     annotations,
+    lookups = [],
     onMarksClick,
     onCommentClick,
     onPdfPage,
@@ -66,13 +69,16 @@ export const CurlBook = forwardRef<CurlHandle, Props>(function CurlBook(
   const marksKey = annotations
     .map((annotation) => `${annotation.id}:${annotation.updatedAt}:${annotation.color ?? ''}:${annotation.comment ?? ''}`)
     .join('|')
+  const lookupKey = lookups.map((item) => `${item.word}\t${item.gloss}`).join('\n')
+  const lookupsRef = useRef(lookups)
 
   useLayoutEffect(() => {
     pdfPageRef.current = pdfPage
     annotationsRef.current = annotations
+    lookupsRef.current = lookups
     handlersRef.current = { onMarksClick, onCommentClick, onPdfPage }
     emptyRef.current = t('reader.emptyBook')
-  }, [annotations, onCommentClick, onMarksClick, onPdfPage, pdfPage, t])
+  }, [annotations, lookups, onCommentClick, onMarksClick, onPdfPage, pdfPage, t])
 
   function report(index: number) {
     indexRef.current = index
@@ -171,6 +177,7 @@ export const CurlBook = forwardRef<CurlHandle, Props>(function CurlBook(
           <CurlPages
             pages={pages}
             annotationsByParagraph={grouped}
+            lookups={lookupsRef.current}
             emptyLabel={emptyRef.current}
             onMarksClick={() => undefined}
             onCommentClick={() => undefined}
@@ -235,7 +242,7 @@ export const CurlBook = forwardRef<CurlHandle, Props>(function CurlBook(
       }
       book?.remove()
     }
-  }, [pages, marksKey, size.width, size.height])
+  }, [pages, marksKey, lookupKey, size.width, size.height])
 
   return <div ref={hostRef} className="curl-host" />
 })
@@ -253,12 +260,14 @@ function groupAnnotations(annotations: Annotation[]): Map<number, Annotation[]> 
 function CurlPages({
   pages,
   annotationsByParagraph,
+  lookups,
   emptyLabel,
   onMarksClick,
   onCommentClick,
 }: {
   pages: ScreenPage[]
   annotationsByParagraph: Map<number, Annotation[]>
+  lookups: LookedUpWord[]
   emptyLabel: string
   onMarksClick: (ids: string[], anchor: Anchor) => void
   onCommentClick: (id: string, anchor: Anchor) => void
@@ -275,6 +284,7 @@ function CurlPages({
             annotations={annotationsByParagraph.get(slice.paragraph.id) ?? []}
             start={slice.start}
             end={slice.end}
+            lookups={lookups}
             onMarksClick={onMarksClick}
             onCommentClick={onCommentClick}
           />

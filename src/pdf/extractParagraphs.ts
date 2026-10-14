@@ -4,6 +4,8 @@ import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import i18n from '../i18n'
 import { finalizeParagraphs, parseTocLine } from '../lib/toc'
 import type { TocEntry } from '../lib/toc'
+import { dropRepeatedFigures, figuresOnPage } from './figures'
+import type { PageFigure } from './figures'
 
 GlobalWorkerOptions.workerSrc = workerUrl
 
@@ -15,7 +17,14 @@ export type Paragraph = {
   isHeading: boolean
   /** A contents-page line. Kept for the chapter list, hidden while reading. */
   isToc?: boolean
+  /** Illustration copied from the PDF, shown at its own aspect ratio. */
+  image?: string
+  imageWidth?: number
+  imageHeight?: number
 }
+
+/** Bump when extraction changes, so dropping the same file in again rebuilds the text. */
+export const TEXT_VERSION = 2
 
 export type ExtractedPdf = {
   title: string
@@ -32,6 +41,22 @@ type Line = {
   y: number
   width: number
   height: number
+}
+
+type RawPage = {
+  pageNumber: number
+  width: number
+  height: number
+  lines: Line[]
+  figures: PageFigure[]
+}
+
+type Block = {
+  text: string
+  isHeading: boolean
+  image?: string
+  imageWidth?: number
+  imageHeight?: number
 }
 
 export class ExtractionError extends Error {}
@@ -57,40 +82,60 @@ export async function extractPdf(
   try {
     info = ((await pdf.getMetadata()).info ?? {}) as Record<string, unknown>
 
+    const pages: RawPage[] = []
     for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
       onProgress?.(pageNumber, pdf.numPages)
       const page = await pdf.getPage(pageNumber)
+      const viewport = page.getViewport({ scale: 1 })
       const content = await page.getTextContent()
       const items = content.items.filter((item): item is TextItem => 'str' in item)
-      const lines = linesFrom(items)
-      if (pageNumber === 1) fontTitle = titleFromLines(lines)
+      const figures = await figuresOnPage(page, viewport.width, viewport.height)
+      pages.push({
+        pageNumber,
+        width: viewport.width,
+        height: viewport.height,
+        lines: linesFrom(items),
+        figures,
+      })
+      page.cleanup()
+    }
 
-      paragraphsOnPage(lines).forEach((text, i) => {
+    removeMargins(pages)
+    dropRepeatedFigures(pages)
+    fontTitle = titleFromLines(pages[0]?.lines ?? [])
+
+    for (const raw of pages) {
+      let continued = false
+      for (const block of blocksOnPage(raw.lines, raw.figures, raw.width)) {
         const last = paragraphs.at(-1)
-        // A paragraph that didn't finish on the previous page continues here.
         if (
-          i === 0 &&
+          !continued &&
+          !block.image &&
           last &&
-          last.endPage === pageNumber - 1 &&
+          !last.image &&
+          last.endPage === raw.pageNumber - 1 &&
           !last.isHeading &&
-          !isHeadingText(text) &&
-          !parseTocLine(text) &&
+          !isHeadingText(block.text) &&
+          !parseTocLine(block.text) &&
           !parseTocLine(last.text) &&
           !endsSentence(last.text)
         ) {
-          last.text = join(last.text, text)
-          last.endPage = pageNumber
+          last.text = join(last.text, block.text)
+          last.endPage = raw.pageNumber
         } else {
           paragraphs.push({
             id: paragraphs.length,
-            text,
-            startPage: pageNumber,
-            endPage: pageNumber,
-            isHeading: isHeadingText(text),
+            text: block.text,
+            startPage: raw.pageNumber,
+            endPage: raw.pageNumber,
+            isHeading: block.isHeading,
+            image: block.image,
+            imageWidth: block.imageWidth,
+            imageHeight: block.imageHeight,
           })
         }
-      })
-      page.cleanup()
+        continued = true
+      }
     }
   } finally {
     await loadingTask.destroy()
@@ -193,31 +238,161 @@ function linesFrom(items: TextItem[]): Line[] {
   return lines
 }
 
-function paragraphsOnPage(lines: Line[]): string[] {
-  if (lines.length === 0) return []
+function blocksOnPage(lines: Line[], figures: PageFigure[], pageWidth: number): Block[] {
+  const twoColumns = hasTwoColumns(lines, pageWidth)
+  const columnOf = (x: number) => (twoColumns && x >= pageWidth * 0.5 ? 1 : 0)
+  type Node =
+    | { kind: 'line'; line: Line; column: number; top: number; x: number }
+    | { kind: 'figure'; figure: PageFigure; column: number; top: number; x: number }
+  const nodes: Node[] = [
+    ...lines.map((line) => ({ kind: 'line' as const, line, column: columnOf(line.x), top: line.y, x: line.x })),
+    ...figures.map((figure) => ({
+      kind: 'figure' as const,
+      figure,
+      column: columnOf(figure.x),
+      top: figure.top,
+      x: figure.x,
+    })),
+  ]
+  nodes.sort((a, b) => a.column - b.column || b.top - a.top || a.x - b.x)
 
-  const lineHeight = median(lines.map((l) => l.height))
-  const lineWidth = median(lines.map((l) => l.width))
-  const lineSpacing =
+  const metrics = lineMetrics(lines)
+  const blocks: Block[] = []
+  let text: string | null = null
+  let previous: Line | null = null
+  const flush = () => {
+    if (!text) return
+    blocks.push({ text, isHeading: isHeadingText(text) })
+    text = null
+  }
+
+  for (const node of nodes) {
+    if (node.kind === 'figure') {
+      flush()
+      previous = null
+      blocks.push({
+        text: '',
+        isHeading: false,
+        image: node.figure.src,
+        imageWidth: node.figure.width,
+        imageHeight: node.figure.height,
+      })
+      continue
+    }
+    const line = node.line
+    if (!text || !previous || startsNewParagraph(line, previous, metrics.height, metrics.width, metrics.spacing)) {
+      flush()
+      text = line.text
+    } else {
+      text = join(text, line.text)
+    }
+    previous = line
+  }
+  flush()
+  return blocks
+}
+
+function hasTwoColumns(lines: Line[], pageWidth: number): boolean {
+  if (lines.length < 8) return false
+  const left = lines.filter((line) => line.x < pageWidth * 0.42).length
+  const right = lines.filter((line) => line.x > pageWidth * 0.58).length
+  return left >= 4 && right >= 4
+}
+
+function lineMetrics(lines: Line[]): { height: number; width: number; spacing: number } {
+  const height = median(lines.map((line) => line.height)) || 12
+  const width = median(lines.map((line) => line.width)) || 1
+  const spacing =
     median(
       lines
         .slice(1)
-        .map((line, i) => lines[i].y - line.y)
-        .filter((d) => d > 0 && d < lineHeight * 3),
-    ) || lineHeight * 1.2
+        .map((line, index) => lines[index].y - line.y)
+        .filter((gap) => gap > 0 && gap < height * 3),
+    ) || height * 1.2
+  return { height, width, spacing }
+}
 
-  const paragraphs: string[] = []
-  let current = lines[0].text
-  for (let i = 1; i < lines.length; i++) {
-    if (startsNewParagraph(lines[i], lines[i - 1], lineHeight, lineWidth, lineSpacing)) {
-      paragraphs.push(current)
-      current = lines[i].text
-    } else {
-      current = join(current, lines[i].text)
+function removeMargins(pages: RawPage[]): void {
+  const counts = new Map<string, Set<number>>()
+  for (const page of pages) {
+    for (const line of page.lines) {
+      const zone = marginZone(line, page.height)
+      if (!zone) continue
+      const key = `${zone}:${runningKey(line.text)}`
+      const pagesWithKey = counts.get(key) ?? new Set<number>()
+      pagesWithKey.add(page.pageNumber)
+      counts.set(key, pagesWithKey)
     }
   }
-  paragraphs.push(current)
-  return paragraphs
+  const repeated = pages.length <= 2 ? 2 : 3
+  for (const page of pages) {
+    const separated = linesOutsideBody(page.lines, page.height)
+    const bodyHeight = median(page.lines.map((line) => line.height)) || 12
+    page.lines = page.lines.filter((line) => {
+      const zone = marginZone(line, page.height)
+      const repeats = zone ? (counts.get(`${zone}:${runningKey(line.text)}`)?.size ?? 0) >= repeated : false
+      if (repeats && line.height <= bodyHeight * 1.35) return false
+      if (line.height > bodyHeight * 1.35 || isHeadingText(line.text)) return true
+      if (separated.has(line)) return false
+      if (zone && isMarginBoilerplate(line.text)) return false
+      return true
+    })
+  }
+}
+
+function marginZone(line: Line, pageHeight: number): 'top' | 'bottom' | null {
+  if (line.y >= pageHeight * 0.86) return 'top'
+  if (line.y <= pageHeight * 0.14) return 'bottom'
+  return null
+}
+
+function runningKey(text: string): string {
+  return text.toLowerCase().replace(/\d+/g, '#').replace(/\s+/g, ' ').trim()
+}
+
+function isMarginBoilerplate(text: string): boolean {
+  if (text.length > 240) return false
+  return (
+    /\bdownloaded from\b/i.test(text) ||
+    /^https?:\/\//i.test(text) ||
+    /\bdoi:\s*10\./i.test(text) ||
+    /^copyright\b/i.test(text) ||
+    /^©/.test(text) ||
+    /\ball rights reserved\b/i.test(text)
+  )
+}
+
+/** Lines pulled away from the body at the top or bottom of the page. */
+function linesOutsideBody(lines: Line[], pageHeight: number): Set<Line> {
+  const drop = new Set<Line>()
+  if (lines.length < 2) return drop
+  const sorted = [...lines].sort((a, b) => b.y - a.y)
+  const height = median(sorted.map((line) => line.height)) || 12
+  const gaps: number[] = []
+  for (let index = 1; index < sorted.length; index++) {
+    const gap = sorted[index - 1].y - sorted[index].y
+    if (gap > height * 0.6 && gap < height * 3) gaps.push(gap)
+  }
+  const spacing = median(gaps) || height * 1.2
+
+  for (let index = 0; index < sorted.length - 1; index++) {
+    const line = sorted[index]
+    if (line.y < pageHeight * 0.88) break
+    if (line.height > height * 1.35 || isHeadingText(line.text)) break
+    const gap = line.y - sorted[index + 1].y
+    if (gap > spacing * 1.6) drop.add(line)
+    else break
+  }
+
+  for (let index = sorted.length - 1; index > 0; index--) {
+    const line = sorted[index]
+    if (line.y > pageHeight * 0.12) break
+    if (line.height > height * 1.35 || isHeadingText(line.text)) break
+    const gap = sorted[index - 1].y - line.y
+    if (gap > spacing * 1.6) drop.add(line)
+    else break
+  }
+  return drop
 }
 
 // PDF page coordinates have their origin at the bottom-left, so lines further down have smaller y.
@@ -267,7 +442,13 @@ function endsSentence(text: string): boolean {
 }
 
 function isPageNumber(text: string): boolean {
-  return /^\d{1,4}$/.test(text)
+  const trimmed = text.trim()
+  return (
+    /^\d{1,4}$/.test(trimmed) ||
+    /^[-–—]\s*\d{1,4}\s*[-–—]$/.test(trimmed) ||
+    /^\d{1,4}\s*[/|]\s*\d{1,4}$/.test(trimmed) ||
+    /^(?:page|p\.?|pp\.?)\s*\d{1,4}(?:\s*(?:of|\/)\s*\d{1,4})?$/i.test(trimmed)
+  )
 }
 
 function isCJK(char: string): boolean {

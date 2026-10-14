@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { TouchEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
-import { isSingleEnglishWord, lookup, LookupError, translateGloss } from '../lib/lookup'
+import { isSingleEnglishWord, lookup, LookupError, rememberLookup, translateGloss } from '../lib/lookup'
 import type { LookupResult } from '../lib/lookup'
 
 type State =
@@ -129,6 +129,20 @@ function LookupContent({ result }: { result: LookupResult }) {
     })()
     return () => controller.abort()
   }, [bilingual, result])
+
+  useEffect(() => {
+    if (result.kind === 'translation') {
+      if (!isSingleEnglishWord(result.source)) return
+      rememberLookup(result.source, { gloss: '', zh: result.translated })
+      return
+    }
+    const meaning = result.entry.meanings[0]
+    const definition = meaning?.definitions[0]?.definition?.trim()
+    if (!definition) return
+    const gloss = meaning.partOfSpeech ? `${meaning.partOfSpeech} · ${definition}` : definition
+    const zh = glosses[definition]
+    rememberLookup(result.entry.word, { gloss, zh })
+  }, [glosses, result])
 
   if (result.kind === 'translation') {
     return (

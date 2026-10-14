@@ -1,6 +1,8 @@
 import { memo, useMemo } from 'react'
-import type { CSSProperties, MouseEvent } from 'react'
+import type { CSSProperties, MouseEvent, ReactElement } from 'react'
 import { useTranslation } from 'react-i18next'
+import type { LookedUpWord } from '../lib/lookup'
+import { normalizeWord } from '../lib/lookup'
 import type { Paragraph } from '../pdf/extractParagraphs'
 import type { Annotation } from '../lib/types'
 import { anchorFromPoint, anchorFromRect, hasTextSelection } from './selection'
@@ -15,6 +17,7 @@ type Props = {
   end?: number
   onMarksClick: (ids: string[], anchor: Anchor) => void
   onCommentClick: (id: string, anchor: Anchor) => void
+  lookups?: LookedUpWord[]
 }
 
 type Segment = {
@@ -77,14 +80,30 @@ export const AnnotatedParagraph = memo(function AnnotatedParagraph({
   end,
   onMarksClick,
   onCommentClick,
+  lookups = [],
 }: Props) {
   const to = end ?? paragraph.text.length
   const segments = useMemo(
     () => buildSegments(paragraph, annotations, start, to),
     [paragraph, annotations, start, to],
   )
+  const lookupRanges = useMemo(() => findLookupRanges(paragraph.text, lookups), [paragraph.text, lookups])
   const { t } = useTranslation()
   const Text = paragraph.isHeading ? 'h3' : 'p'
+
+  if (paragraph.image) {
+    return (
+      <figure className="paragraph figure">
+        <img
+          src={paragraph.image}
+          alt=""
+          width={paragraph.imageWidth}
+          height={paragraph.imageHeight}
+          draggable={false}
+        />
+      </figure>
+    )
+  }
 
   function handleMarkClick(event: MouseEvent, covering: Annotation[]) {
     if (hasTextSelection()) return
@@ -100,10 +119,11 @@ export const AnnotatedParagraph = memo(function AnnotatedParagraph({
         {segments.map((segment) => {
           const text = paragraph.text.slice(segment.start, segment.end)
           const { covering } = segment
+          const body = renderLookups(text, segment.start, lookupRanges)
           return (
             <span key={segment.start}>
               {covering.length === 0 ? (
-                text
+                body
               ) : (
                 <span
                   className={`mark${covering.some((a) => a.kind === 'comment') ? ' commented' : ''}`}
@@ -121,7 +141,7 @@ export const AnnotatedParagraph = memo(function AnnotatedParagraph({
                   }
                   onClick={(e) => handleMarkClick(e, covering)}
                 >
-                  {text}
+                  {body}
                 </span>
               )}
               {segment.commentsEndingHere.map((comment) => (
@@ -145,3 +165,45 @@ export const AnnotatedParagraph = memo(function AnnotatedParagraph({
     </div>
   )
 })
+
+type LookupSpan = { start: number; end: number; gloss: string }
+
+function findLookupRanges(text: string, lookups: LookedUpWord[]): LookupSpan[] {
+  if (lookups.length === 0 || !text) return []
+  const glossByWord = new Map(lookups.map((item) => [item.word, item.gloss]))
+  const alternation = [...glossByWord.keys()]
+    .sort((a, b) => b.length - a.length)
+    .map((word) => word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('|')
+  if (!alternation) return []
+  const pattern = new RegExp(`(?<![\\p{L}\\p{N}])(?:${alternation})(?![\\p{L}\\p{N}])`, 'giu')
+  const found: LookupSpan[] = []
+  for (const match of text.matchAll(pattern)) {
+    if (match.index == null) continue
+    const gloss = glossByWord.get(normalizeWord(match[0]))
+    if (!gloss) continue
+    found.push({ start: match.index, end: match.index + match[0].length, gloss })
+  }
+  return found
+}
+
+function renderLookups(text: string, base: number, ranges: LookupSpan[]) {
+  const local = ranges.filter((range) => range.end > base && range.start < base + text.length)
+  if (local.length === 0) return text
+  const parts: (string | ReactElement)[] = []
+  let cursor = 0
+  for (const range of local) {
+    const start = Math.max(0, range.start - base)
+    const end = Math.min(text.length, range.end - base)
+    if (end <= start) continue
+    if (start > cursor) parts.push(text.slice(cursor, start))
+    parts.push(
+      <span key={base + start} className="looked-up" data-gloss={range.gloss}>
+        {text.slice(start, end)}
+      </span>,
+    )
+    cursor = end
+  }
+  if (cursor < text.length) parts.push(text.slice(cursor))
+  return parts
+}

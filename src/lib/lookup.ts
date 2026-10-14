@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import i18n from '../i18n'
 
 export type DictionaryEntry = {
@@ -263,6 +264,91 @@ function writeGloss(text: string, gloss: string): void {
   } catch {
     // A full localStorage should not hide the English definition.
   }
+}
+
+const LOOKED_KEY = 'paper-reader.looked-up'
+const LOOKED_EVENT = 'paper-reader-lookups'
+
+type SavedLookup = { gloss: string; zh?: string }
+
+export type LookedUpWord = { word: string; gloss: string }
+
+function readSavedLookups(): Record<string, SavedLookup> {
+  try {
+    const all = JSON.parse(localStorage.getItem(LOOKED_KEY) || '{}') as Record<string, SavedLookup>
+    return all && typeof all === 'object' ? all : {}
+  } catch {
+    return {}
+  }
+}
+
+function displayGloss(saved: SavedLookup): string {
+  const gloss = saved.gloss.trim()
+  const zh = saved.zh?.trim()
+  if (i18n.language.startsWith('zh')) {
+    if (zh && gloss && zh !== gloss) return `${zh}\n${gloss}`
+    return zh || gloss
+  }
+  return gloss || zh || ''
+}
+
+function glossFromEntry(entry: DictionaryEntry): SavedLookup | null {
+  const meaning = entry.meanings[0]
+  const definition = meaning?.definitions[0]?.definition?.trim()
+  if (!definition) return null
+  const gloss = meaning.partOfSpeech ? `${meaning.partOfSpeech} · ${definition}` : definition
+  const zh = readGloss(definition)?.trim()
+  return { gloss, zh: zh && zh !== definition ? zh : undefined }
+}
+
+/** Words the reader has looked up, with a short gloss for the hover tip. */
+export function listLookedUp(): LookedUpWord[] {
+  const saved = readSavedLookups()
+  try {
+    const cached = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}') as Record<string, DictionaryEntry | null>
+    for (const [word, entry] of Object.entries(cached)) {
+      if (saved[word] || !entry) continue
+      const built = glossFromEntry(entry)
+      if (built) saved[word] = built
+    }
+  } catch {
+    // A broken dictionary cache still leaves the words saved from the panel.
+  }
+  return Object.entries(saved)
+    .map(([word, item]) => ({ word, gloss: displayGloss(item) }))
+    .filter((item) => item.word && item.gloss)
+}
+
+/** Remember a looked-up word so the reader can underline it. */
+export function rememberLookup(word: string, saved: SavedLookup): void {
+  const key = normalizeWord(word)
+  const gloss = saved.gloss.replace(/\s+/g, ' ').trim().slice(0, 240)
+  const zh = saved.zh?.replace(/\s+/g, ' ').trim().slice(0, 240)
+  if (!key || (!gloss && !zh)) return
+  const all = readSavedLookups()
+  const prev = all[key]
+  if (prev && prev.gloss === gloss && prev.zh === zh) return
+  all[key] = { gloss, zh: zh || undefined }
+  try {
+    localStorage.setItem(LOOKED_KEY, JSON.stringify(all))
+  } catch {
+    return
+  }
+  window.dispatchEvent(new Event(LOOKED_EVENT))
+}
+
+export function useLookups(): LookedUpWord[] {
+  const [words, setWords] = useState(listLookedUp)
+  useEffect(() => {
+    const reload = () => setWords(listLookedUp())
+    window.addEventListener(LOOKED_EVENT, reload)
+    i18n.on('languageChanged', reload)
+    return () => {
+      window.removeEventListener(LOOKED_EVENT, reload)
+      i18n.off('languageChanged', reload)
+    }
+  }, [])
+  return words
 }
 
 /** Chinese gloss for one English definition. Cached in this browser. */
