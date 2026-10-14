@@ -24,7 +24,7 @@ export type Paragraph = {
 }
 
 /** Bump when extraction changes, so dropping the same file in again rebuilds the text. */
-export const TEXT_VERSION = 2
+export const TEXT_VERSION = 3
 
 export type ExtractedPdf = {
   title: string
@@ -313,36 +313,42 @@ function lineMetrics(lines: Line[]): { height: number; width: number; spacing: n
 }
 
 function removeMargins(pages: RawPage[]): void {
-  const counts = new Map<string, Set<number>>()
+  const edgeCounts = new Map<string, Set<number>>()
+  const edgeLines = new Set<Line>()
   for (const page of pages) {
-    for (const line of page.lines) {
-      const zone = marginZone(line, page.height)
-      if (!zone) continue
-      const key = `${zone}:${runningKey(line.text)}`
-      const pagesWithKey = counts.get(key) ?? new Set<number>()
-      pagesWithKey.add(page.pageNumber)
-      counts.set(key, pagesWithKey)
+    const sorted = [...page.lines].sort((a, b) => b.y - a.y)
+    const edges = [...sorted.slice(0, 3), ...sorted.slice(-3)]
+    for (const line of edges) {
+      edgeLines.add(line)
+      const key = runningKey(line.text)
+      if (key.length < 8) continue
+      const seen = edgeCounts.get(key) ?? new Set<number>()
+      seen.add(page.pageNumber)
+      edgeCounts.set(key, seen)
     }
   }
   const repeated = pages.length <= 2 ? 2 : 3
+
   for (const page of pages) {
     const separated = linesOutsideBody(page.lines, page.height)
     const bodyHeight = median(page.lines.map((line) => line.height)) || 12
     page.lines = page.lines.filter((line) => {
-      const zone = marginZone(line, page.height)
-      const repeats = zone ? (counts.get(`${zone}:${runningKey(line.text)}`)?.size ?? 0) >= repeated : false
-      if (repeats && line.height <= bodyHeight * 1.35) return false
-      if (line.height > bodyHeight * 1.35 || isHeadingText(line.text)) return true
+      if (isMarginBoilerplate(line.text)) return false
+      if (line.height > bodyHeight * 1.35) return true
+      const key = runningKey(line.text)
+      const seen = key.length >= 8 ? (edgeCounts.get(key)?.size ?? 0) : 0
+      const running = seen >= repeated && line.text.length < 160
+      if (running && (edgeLines.has(line) || marginZone(line, page.height))) return false
+      if (isHeadingText(line.text)) return true
       if (separated.has(line)) return false
-      if (zone && isMarginBoilerplate(line.text)) return false
       return true
     })
   }
 }
 
 function marginZone(line: Line, pageHeight: number): 'top' | 'bottom' | null {
-  if (line.y >= pageHeight * 0.86) return 'top'
-  if (line.y <= pageHeight * 0.14) return 'bottom'
+  if (line.y >= pageHeight * 0.8) return 'top'
+  if (line.y <= pageHeight * 0.2) return 'bottom'
   return null
 }
 
@@ -351,14 +357,15 @@ function runningKey(text: string): string {
 }
 
 function isMarginBoilerplate(text: string): boolean {
-  if (text.length > 240) return false
+  const trimmed = text.trim()
+  if (!trimmed || trimmed.length > 320) return false
+  if (/\bdownloaded from\b/i.test(trimmed) && /https?:\/\//i.test(trimmed)) return true
+  if (/\bdoi\s*:?\s*10\.\d/i.test(trimmed) && /\bcopyright\b/i.test(trimmed)) return true
   return (
-    /\bdownloaded from\b/i.test(text) ||
-    /^https?:\/\//i.test(text) ||
-    /\bdoi:\s*10\./i.test(text) ||
-    /^copyright\b/i.test(text) ||
-    /^©/.test(text) ||
-    /\ball rights reserved\b/i.test(text)
+    /^https?:\/\//i.test(trimmed) ||
+    /^copyright\b/i.test(trimmed) ||
+    /^©/.test(trimmed) ||
+    /\ball rights reserved\b/i.test(trimmed)
   )
 }
 
@@ -377,7 +384,7 @@ function linesOutsideBody(lines: Line[], pageHeight: number): Set<Line> {
 
   for (let index = 0; index < sorted.length - 1; index++) {
     const line = sorted[index]
-    if (line.y < pageHeight * 0.88) break
+    if (line.y < pageHeight * 0.8) break
     if (line.height > height * 1.35 || isHeadingText(line.text)) break
     const gap = line.y - sorted[index + 1].y
     if (gap > spacing * 1.6) drop.add(line)
@@ -386,7 +393,7 @@ function linesOutsideBody(lines: Line[], pageHeight: number): Set<Line> {
 
   for (let index = sorted.length - 1; index > 0; index--) {
     const line = sorted[index]
-    if (line.y > pageHeight * 0.12) break
+    if (line.y > pageHeight * 0.2) break
     if (line.height > height * 1.35 || isHeadingText(line.text)) break
     const gap = sorted[index - 1].y - line.y
     if (gap > spacing * 1.6) drop.add(line)
