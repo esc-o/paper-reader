@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, MouseEvent as ReactMouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { SiteChrome } from '../components/SiteChrome'
+import { anchorAnnotations } from '../lib/anchorNotes'
 import { LIBRARY_EVENT } from '../lib/changes'
 import { deleteAnnotation, getBook, listAnnotations, saveAnnotation, saveBook, saveProgress } from '../lib/db'
 import { familyFor, useFonts } from '../lib/fonts'
@@ -79,8 +80,10 @@ export function ReaderPage({ bookId, noteId }: { bookId: string; noteId?: string
       const prepared = prepareBook(found)
       if (prepared.changed) await saveBook(prepared.book)
       if (cancelled) return
+      const anchored = await anchorAnnotations(prepared.book.paragraphs, saved)
+      if (cancelled) return
       setBook(prepared.book)
-      setAnnotations(saved)
+      setAnnotations(anchored)
       setPage(prepared.book.currentPage)
       saveProgress(prepared.book.id, prepared.book.currentPage)
     })()
@@ -92,8 +95,13 @@ export function ReaderPage({ bookId, noteId }: { bookId: string; noteId?: string
   useEffect(() => {
     const refresh = async () => {
       const [found, saved] = await Promise.all([getBook(bookId), listAnnotations(bookId)])
-      setAnnotations(saved)
-      if (!found) return
+      if (!found) {
+        setAnnotations(saved)
+        return
+      }
+      const prepared = prepareBook(found)
+      const anchored = await anchorAnnotations(prepared.book.paragraphs, saved)
+      setAnnotations(anchored)
       setBook((prev) => {
         if (!prev) return prepareBook(found).book
         if (prev.needsFile && found.paragraphs.length > 0) return prepareBook(found).book

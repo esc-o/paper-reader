@@ -3,8 +3,9 @@ import i18n from '../i18n'
 import { extractPdf, ExtractionError, TEXT_VERSION } from '../pdf/extractParagraphs'
 import type { Paragraph } from '../pdf/extractParagraphs'
 import { authorsForDoi, doiInText, usableAuthor } from './authors'
+import { anchorAnnotations } from './anchorNotes'
 import { notifyLibrary } from './changes'
-import { getBook, saveBook } from './db'
+import { getBook, listAnnotations, saveBook } from './db'
 import { yearInTitle } from './shelfQuery'
 import { finalizeParagraphs } from './toc'
 import type { Book } from './types'
@@ -60,6 +61,7 @@ export async function importPdf(
     year,
     classifyUpdatedAt: existing?.classifyUpdatedAt ?? (year ? now : undefined),
   })
+  await anchorAnnotations(pdf.paragraphs, await listAnnotations(id))
   notifyLibrary()
   return id
 }

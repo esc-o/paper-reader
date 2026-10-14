@@ -113,6 +113,14 @@ export async function saveAnnotation(annotation: Annotation): Promise<void> {
   notifyLocalChange()
 }
 
+/** Stores annotations without treating them as an edit. Local offsets can change while the note stays the same. */
+export async function putAnnotations(annotations: Annotation[]): Promise<void> {
+  if (annotations.length === 0) return
+  const tx = (await dbPromise).transaction('annotations', 'readwrite')
+  await Promise.all(annotations.map((annotation) => tx.store.put(annotation)))
+  await tx.done
+}
+
 export async function deleteAnnotation(id: string): Promise<void> {
   const db = await dbPromise
   const existing = await db.get('annotations', id)

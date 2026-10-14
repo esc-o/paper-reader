@@ -606,8 +606,11 @@
     min-width: 0;
     padding: 20px 16px 26px;
   }
-  .card-week-line {
+  .home-cards > .card {
+    width: 100%;
     max-width: none;
+    min-width: 0;
+    margin: 0;
   }
   .hero-main {
     padding: 12px 0 28px;
