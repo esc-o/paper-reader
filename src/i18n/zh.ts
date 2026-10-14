@@ -146,7 +146,7 @@ const zh = {
     flipDesktop: '电脑：左右滑动或按方向键。',
     scrollHint: '整篇连续往下读，读到哪一页会自动记住。',
     font: '字体',
-    fontDefault: '系统默认',
+    fontDefault: 'Chiron 圆',
     fontUpload: '上传字体',
     fontDelete: '删除',
   },

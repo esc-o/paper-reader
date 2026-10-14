@@ -149,7 +149,7 @@ const en: Dictionary = {
     flipDesktop: 'Desktop: swipe or use the arrow keys.',
     scrollHint: 'Read straight down. The page you reach is remembered.',
     font: 'Font',
-    fontDefault: 'System default',
+    fontDefault: 'Chiron Yuan',
     fontUpload: 'Upload font',
     fontDelete: 'Delete',
   },

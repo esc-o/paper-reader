@@ -25,14 +25,21 @@
   --radius-button: 999px;
   --radius-card: calc(32px / 2);
 
-  font-family: 'Inter Variable', Inter, system-ui, -apple-system, 'Segoe UI', 'PingFang SC',
-    'Microsoft YaHei', sans-serif;
+  font-family: 'Chiron Yuan', 'PingFang SC', 'Microsoft YaHei', system-ui, -apple-system, 'Segoe UI',
+    sans-serif;
   font-size: 16px;
   line-height: 1.5;
   color: var(--ink);
   background: var(--cream);
   -webkit-font-smoothing: antialiased;
-  font-feature-settings: 'cv11', 'ss01';
+}
+
+@font-face {
+  font-family: 'Chiron Yuan';
+  src: url('/fonts/ChironYuan-Medium.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
 }
 
 body {
