@@ -24,6 +24,7 @@ const en: Dictionary = {
     toDay: 'Switch to day',
   },
   lang: {
+    choose: 'Choose language',
     switch: 'Switch to {{name}}',
     zh: '中文',
     en: 'English',
@@ -124,6 +125,7 @@ const en: Dictionary = {
     reimportButton: 'Choose a file',
     emptyBook: 'There is no body text to lay out.',
     importFailed: 'Could not import that file. Try another one.',
+    returnHome: 'Back home',
   },
   menu: {
     open: 'Open reading menu',

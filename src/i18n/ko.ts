@@ -24,6 +24,7 @@ const ko: Dictionary = {
     toDay: '낮으로 전환',
   },
   lang: {
+    choose: '언어 선택',
     switch: '{{name}}(으)로 전환',
     zh: '中文',
     en: 'English',
@@ -124,6 +125,7 @@ const ko: Dictionary = {
     reimportButton: '파일 선택',
     emptyBook: '배치할 본문이 없습니다.',
     importFailed: '가져오지 못했습니다. 다른 파일을 시도해 주세요.',
+    returnHome: '홈으로',
   },
   menu: {
     open: '읽기 메뉴 열기',

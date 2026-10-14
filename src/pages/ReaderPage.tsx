@@ -54,6 +54,7 @@ export function ReaderPage({ bookId, noteId }: { bookId: string; noteId?: string
   const pageRef = useRef(page)
   const scrollAligned = useRef('')
   const menuOpenRef = useRef(menuOpen)
+  const [showHome, setShowHome] = useState(false)
   const [reimportError, setReimportError] = useState<string | null>(null)
   const [reimporting, setReimporting] = useState(false)
   const lastTapAt = useRef(0)
@@ -66,6 +67,13 @@ export function ReaderPage({ bookId, noteId }: { bookId: string; noteId?: string
   }, [page, menuOpen])
 
   useReadingTimer()
+
+  useEffect(() => {
+    if (!showHome) return
+    const hide = () => setShowHome(false)
+    window.addEventListener('scroll', hide, { passive: true })
+    return () => window.removeEventListener('scroll', hide)
+  }, [showHome])
 
   useEffect(() => {
     let cancelled = false
@@ -429,8 +437,31 @@ export function ReaderPage({ bookId, noteId }: { bookId: string; noteId?: string
     if (lookup || menuOpen) return
     const target = event.target
     if (!(target instanceof Element)) return
-    if (target.closest('a, button, input, textarea, .mark, .comment-bubble, .floating, .reading-fab, .pager')) return
+    if (target.closest('a, button, input, textarea, .mark, .comment-bubble, .floating, .reading-fab, .pager, .reader-bar, .site-chrome')) return
+    if (settings.pageMode === 'scroll') {
+      const now = Date.now()
+      const close =
+        now - lastTapAt.current < 300 &&
+        Math.hypot(event.clientX - lastTapX.current, event.clientY - lastTapY.current) < 36
+      if (close) {
+        window.clearTimeout(tapTimer.current)
+        lastTapAt.current = 0
+        setShowHome(false)
+        if (selectWordAt(event.clientX, event.clientY)) {
+          const pending = readSelection(contentRef.current)
+          if (pending) openLookup(pending)
+        }
+        return
+      }
+    }
     if (hasTextSelection()) return
+    if (settings.pageMode === 'scroll') {
+      lastTapAt.current = Date.now()
+      lastTapX.current = event.clientX
+      lastTapY.current = event.clientY
+      tapTimer.current = window.setTimeout(() => setShowHome(true), 280)
+      return
+    }
     if (settings.pageMode === 'flip') {
       const surface = contentRef.current?.getBoundingClientRect()
       const width = surface && surface.width > 0 ? surface.width : window.innerWidth
@@ -460,7 +491,6 @@ export function ReaderPage({ bookId, noteId }: { bookId: string; noteId?: string
       else goToPage(pageRef.current + delta)
       return
     }
-    if (narrow) return
     const x = event.clientX / window.innerWidth
     const y = event.clientY / window.innerHeight
     if (x < 0.3 || x > 0.7 || y < 0.22 || y > 0.78) return
@@ -531,6 +561,9 @@ export function ReaderPage({ bookId, noteId }: { bookId: string; noteId?: string
       onClick={onReaderClick}
     >
       <SiteChrome />
+      {settings.pageMode === 'scroll' && showHome && (
+        <a className="scroll-home" href={routes.home}>{t('reader.returnHome')}</a>
+      )}
       <header className="reader-bar">
         <a className="reader-back" href={routes.home}>{t('nav.backHome')}</a>
         <span className="reader-title" title={book.title}>{book.title}</span>
@@ -599,7 +632,7 @@ export function ReaderPage({ bookId, noteId }: { bookId: string; noteId?: string
         </nav>
       )}
 
-      {selection && !popover && !menuOpen && (
+      {selection && !popover && !menuOpen && !lookup && (
         <SelectionToolbar
           selection={selection}
           onHighlight={(color) => {
