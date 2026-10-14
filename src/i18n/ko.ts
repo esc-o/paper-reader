@@ -130,6 +130,8 @@ const ko: Dictionary = {
   menu: {
     open: '읽기 메뉴 열기',
     close: '읽기 메뉴 닫기',
+    toTop: '맨 위로',
+    toHome: '홈으로',
     export: '노트 내보내기',
     closeButton: '닫기',
     label: '읽기 메뉴',

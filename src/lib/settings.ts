@@ -79,6 +79,14 @@ export function followAppearance(mode: 'day' | 'night', publish: boolean): void 
   if (publish) notifyLocalChange()
 }
 
+function localAppearance(): 'day' | 'night' {
+  try {
+    return localStorage.getItem('paper-reader.appearance') === 'night' ? 'night' : 'day'
+  } catch {
+    return 'day'
+  }
+}
+
 /** Fields that follow the reader from device to device. The button position stays local. */
 export function syncedSettings(settings: ReaderSettings) {
   return {
@@ -88,6 +96,7 @@ export function syncedSettings(settings: ReaderSettings) {
     theme: settings.theme,
     pageMode: settings.pageMode,
     fontId: settings.fontId,
+    appearance: localAppearance(),
     updatedAt: settings.updatedAt,
   }
 }

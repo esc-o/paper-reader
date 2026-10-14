@@ -130,6 +130,8 @@ const en: Dictionary = {
   menu: {
     open: 'Open reading menu',
     close: 'Close reading menu',
+    toTop: 'Back to top',
+    toHome: 'Back home',
     export: 'Export notes',
     closeButton: 'Close',
     label: 'Reading menu',

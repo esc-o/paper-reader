@@ -25,6 +25,13 @@
   --radius-button: 999px;
   --radius-card: calc(32px / 2);
 
+  --card-bg: #fffdf9;
+  --card-text: #2b2220;
+  --card-muted: #7a706b;
+  --card-track: rgba(43, 34, 32, 0.1);
+  --card-fill: #2b2220;
+  --card-progress: #e7edf7;
+
   font-family: 'Chiron Yuan', 'PingFang SC', 'Microsoft YaHei', system-ui, -apple-system, 'Segoe UI',
     sans-serif;
   font-size: 16px;
@@ -50,6 +57,17 @@ html.appearance-night {
   color-scheme: dark;
   background: #1f1f22;
   color: #f4efe8;
+  --ink: #f4efe8;
+  --muted: #d2cbc4;
+  --line: #4a433e;
+  --cream: #1f1f22;
+  --accent-ink: #e7e0d8;
+  --card-bg: #2c2826;
+  --card-text: #f4efe8;
+  --card-muted: #d2cbc4;
+  --card-track: rgba(255, 255, 255, 0.14);
+  --card-fill: #f4efe8;
+  --card-progress: #2c2826;
 }
 
 html.appearance-night .home-cards,
@@ -58,14 +76,11 @@ html.appearance-night .shelf {
   color: #f4efe8;
 }
 
-html.appearance-night .card {
-  background: #221e1b;
-  color: #f4efe8;
-  box-shadow: none;
-}
-
+html.appearance-night .card,
 html.appearance-night .card-progress {
-  background: #243044;
+  background: var(--card-bg);
+  color: var(--card-text);
+  box-shadow: none;
 }
 
 html.appearance-night .card-number,
@@ -93,7 +108,7 @@ html.appearance-night .note-book,
 html.appearance-night .card-label,
 html.appearance-night .shelf-empty,
 html.appearance-night .dropzone-hint {
-  color: #b7aea8;
+  color: var(--muted);
 }
 
 html.appearance-night .progress-track {
@@ -154,7 +169,8 @@ html.appearance-night .account-menu button:hover {
   background: rgba(255, 255, 255, 0.08);
 }
 
-html.appearance-night .book-menu button.danger {
+html.appearance-night .book-menu button.danger,
+html.appearance-night .folder-mini.danger {
   color: #ff8a8a;
 }
 
@@ -170,9 +186,25 @@ html.appearance-night .folder-select,
 html.appearance-night .tag-form input,
 html.appearance-night .menu-field select,
 html.appearance-night .menu-field input {
-  background: #221e1b;
-  color: #f4efe8;
-  border-color: #3a322e;
+  background: var(--card-bg);
+  color: var(--ink);
+  border-color: var(--line);
+}
+
+html.appearance-night .shelf-sort,
+html.appearance-night .folder-list > button,
+html.appearance-night .folder-row > button:first-child,
+html.appearance-night .folder-mini {
+  color: var(--ink);
+  background: transparent;
+}
+
+html.appearance-night .shelf-search::placeholder,
+html.appearance-night .folder-form input::placeholder,
+html.appearance-night .tag-form input::placeholder,
+html.appearance-night .menu-field input::placeholder {
+  color: var(--muted);
+  opacity: 1;
 }
 
 html.appearance-night .folder-list > button.on,

@@ -14,8 +14,8 @@
   box-sizing: border-box;
   padding: 22px;
   border-radius: var(--radius-card);
-  background: #fffdf9;
-  color: var(--ink);
+  background: var(--card-bg);
+  color: var(--card-text);
   box-shadow: 0 20px 50px rgba(43, 34, 32, 0.25);
 }
 

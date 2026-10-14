@@ -21,6 +21,7 @@ import {
   saveTag,
 } from './db'
 import { consumeFollowUp, runSilently, notifyLibrary } from './changes'
+import { adoptAppearance } from './appearance'
 import { loadSettings, saveSettings, syncedSettings } from './settings'
 import type { ReaderSettings } from './settings'
 import { supabase } from './supabase'
@@ -352,7 +353,7 @@ async function mergeSettings(userId: string): Promise<void> {
   if (local.updatedAt > remoteStamp) {
     await pushSettings(userId, local)
   } else if (remoteStamp > local.updatedAt) {
-    const payload = remote.payload
+    const payload = remote.payload as Partial<ReaderSettings> & { appearance?: unknown }
     saveSettings({
       ...local,
       fontSize: payload.fontSize ?? local.fontSize,
@@ -363,6 +364,12 @@ async function mergeSettings(userId: string): Promise<void> {
       fontId: payload.fontId ?? null,
       updatedAt: remoteStamp,
     })
+    const appearance = payload.appearance === 'night' || payload.appearance === 'day'
+      ? payload.appearance
+      : payload.theme === 'night' || payload.theme === 'day'
+        ? payload.theme
+        : null
+    if (appearance) adoptAppearance(appearance)
   }
 }
 

@@ -54,7 +54,6 @@ export function ReaderPage({ bookId, noteId }: { bookId: string; noteId?: string
   const pageRef = useRef(page)
   const scrollAligned = useRef('')
   const menuOpenRef = useRef(menuOpen)
-  const [showHome, setShowHome] = useState(false)
   const [reimportError, setReimportError] = useState<string | null>(null)
   const [reimporting, setReimporting] = useState(false)
   const lastTapAt = useRef(0)
@@ -67,13 +66,6 @@ export function ReaderPage({ bookId, noteId }: { bookId: string; noteId?: string
   }, [page, menuOpen])
 
   useReadingTimer()
-
-  useEffect(() => {
-    if (!showHome) return
-    const hide = () => setShowHome(false)
-    window.addEventListener('scroll', hide, { passive: true })
-    return () => window.removeEventListener('scroll', hide)
-  }, [showHome])
 
   useEffect(() => {
     let cancelled = false
@@ -437,29 +429,28 @@ export function ReaderPage({ bookId, noteId }: { bookId: string; noteId?: string
     if (lookup || menuOpen) return
     const target = event.target
     if (!(target instanceof Element)) return
-    if (target.closest('a, button, input, textarea, .mark, .comment-bubble, .floating, .reading-fab, .pager, .reader-bar, .site-chrome')) return
-    if (settings.pageMode === 'scroll') {
-      const now = Date.now()
+    if (target.closest('a, button, input, textarea, .mark, .comment-bubble, .floating, .reading-fab, .reading-fab-stack, .pager, .reader-bar, .site-chrome')) return
+    const now = Date.now()
+    const wordGesture = settings.pageMode === 'scroll' || (settings.pageMode === 'flip' && narrow)
+    if (wordGesture) {
       const close =
         now - lastTapAt.current < 300 &&
         Math.hypot(event.clientX - lastTapX.current, event.clientY - lastTapY.current) < 36
       if (close) {
         window.clearTimeout(tapTimer.current)
         lastTapAt.current = 0
-        setShowHome(false)
         if (selectWordAt(event.clientX, event.clientY)) {
           const pending = readSelection(contentRef.current)
-          if (pending) openLookup(pending)
+          if (pending) setSelection(pending)
         }
         return
       }
     }
     if (hasTextSelection()) return
     if (settings.pageMode === 'scroll') {
-      lastTapAt.current = Date.now()
+      lastTapAt.current = now
       lastTapX.current = event.clientX
       lastTapY.current = event.clientY
-      tapTimer.current = window.setTimeout(() => setShowHome(true), 280)
       return
     }
     if (settings.pageMode === 'flip') {
@@ -468,23 +459,13 @@ export function ReaderPage({ bookId, noteId }: { bookId: string; noteId?: string
       const origin = surface?.left ?? 0
       const delta = (event.clientX - origin) / width < 0.5 ? -1 : 1
       if (narrow) {
-        const now = Date.now()
-        const close =
-          now - lastTapAt.current < 300 &&
-          Math.hypot(event.clientX - lastTapX.current, event.clientY - lastTapY.current) < 36
-        if (close) {
-          window.clearTimeout(tapTimer.current)
-          lastTapAt.current = 0
-          selectWordAt(event.clientX, event.clientY)
-          return
-        }
         lastTapAt.current = now
         lastTapX.current = event.clientX
         lastTapY.current = event.clientY
         tapTimer.current = window.setTimeout(() => {
           if (curlRef.current) curlRef.current.flip(delta)
           else goToPage(pageRef.current + delta)
-        }, 280)
+        }, 340)
         return
       }
       if (curlRef.current) curlRef.current.flip(delta)
@@ -561,9 +542,6 @@ export function ReaderPage({ bookId, noteId }: { bookId: string; noteId?: string
       onClick={onReaderClick}
     >
       <SiteChrome />
-      {settings.pageMode === 'scroll' && showHome && (
-        <a className="scroll-home" href={routes.home}>{t('reader.returnHome')}</a>
-      )}
       <header className="reader-bar">
         <a className="reader-back" href={routes.home}>{t('nav.backHome')}</a>
         <span className="reader-title" title={book.title}>{book.title}</span>
@@ -692,7 +670,22 @@ export function ReaderPage({ bookId, noteId }: { bookId: string; noteId?: string
 
       {lookup && <LookupPanel key={lookup.text} text={lookup.text} anchor={lookup.anchor} onClose={closeLookup} />}
 
-      <ReadingFab open={menuOpen} position={settings.fab} onPosition={(fab) => updateSettings({ fab })} onToggle={toggleMenu} />
+      <ReadingFab
+        open={menuOpen}
+        position={settings.fab}
+        onPosition={(fab) => updateSettings({ fab })}
+        onToggle={toggleMenu}
+        onTop={() => {
+          if (settings.pageMode === 'scroll') window.scrollTo({ top: 0, behavior: 'smooth' })
+          else goToPage(1)
+        }}
+        onHome={() => {
+          void saveProgress(book.id, pageRef.current).finally(() => {
+            window.location.hash = routes.home
+          })
+        }}
+        showTop={settings.pageMode === 'scroll'}
+      />
       {menuOpen && (
         <ReaderMenu
           book={book}

@@ -127,6 +127,8 @@ const zh = {
   menu: {
     open: '打开阅读菜单',
     close: '关闭阅读菜单',
+    toTop: '回到顶部',
+    toHome: '回到首页',
     export: '导出笔记',
     closeButton: '关闭',
     label: '阅读菜单',

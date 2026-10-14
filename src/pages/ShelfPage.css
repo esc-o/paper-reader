@@ -224,7 +224,7 @@
   border: 0;
   border-radius: var(--radius-button);
   background: transparent;
-  color: var(--muted);
+  color: var(--ink);
   font: inherit;
   font-size: 14px;
   font-weight: 650;
@@ -291,6 +291,14 @@
   font-size: 14px;
 }
 
+.shelf-search::placeholder,
+.folder-form input::placeholder,
+.tag-form input::placeholder,
+.menu-field input::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+
 .shelf-sort,
 .menu-field {
   display: flex;
@@ -301,7 +309,7 @@
   font-weight: 650;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--ink);
 }
 
 .shelf-tools {

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
+import { setAppearance } from '../lib/appearance'
 import { useFonts } from '../lib/fonts'
 import type { ReaderSettings, ReaderTheme } from '../lib/settings'
 import { displayPage } from '../lib/toc'
@@ -9,25 +10,29 @@ import type { TocEntry } from '../lib/toc'
 import type { Book } from '../lib/types'
 import './ReaderMenu.css'
 
-const FAB_SIZE = 52
+const FAB_SIZE = 40
+const STACK_GAP = 10
 const FAB_MARGIN = 16
+
+function stackLift(showTop: boolean) {
+  const above = (showTop ? 1 : 0) + 1
+  return above * (FAB_SIZE + STACK_GAP)
+}
 
 type TocItem = { title: string; pdfPage: number; bookPage: number; level: number }
 
-function defaultFab(): { x: number; y: number } {
+function snap(x: number, y: number, lift: number): { x: number; y: number } {
+  const maxX = Math.max(FAB_MARGIN, window.innerWidth - FAB_SIZE - FAB_MARGIN)
+  const minY = FAB_MARGIN + lift
+  const maxY = Math.max(minY, window.innerHeight - FAB_SIZE - FAB_MARGIN)
   return {
-    x: Math.max(FAB_MARGIN, window.innerWidth - FAB_SIZE - FAB_MARGIN),
-    y: Math.max(FAB_MARGIN, window.innerHeight - FAB_SIZE - 28),
+    x: x + FAB_SIZE / 2 < window.innerWidth / 2 ? FAB_MARGIN : maxX,
+    y: Math.min(Math.max(minY, y), maxY),
   }
 }
 
-function snap(x: number, y: number): { x: number; y: number } {
-  const maxX = Math.max(FAB_MARGIN, window.innerWidth - FAB_SIZE - FAB_MARGIN)
-  const maxY = Math.max(FAB_MARGIN, window.innerHeight - FAB_SIZE - FAB_MARGIN)
-  return {
-    x: x + FAB_SIZE / 2 < window.innerWidth / 2 ? FAB_MARGIN : maxX,
-    y: Math.min(Math.max(FAB_MARGIN, y), maxY),
-  }
+function defaultFab(lift: number): { x: number; y: number } {
+  return snap(window.innerWidth - FAB_SIZE - FAB_MARGIN, window.innerHeight - FAB_SIZE - 28, lift)
 }
 
 export function ReadingFab({
@@ -35,29 +40,49 @@ export function ReadingFab({
   position,
   onPosition,
   onToggle,
+  onTop,
+  onHome,
+  showTop,
 }: {
   open: boolean
   position: ReaderSettings['fab']
   onPosition: (position: { x: number; y: number }) => void
   onToggle: () => void
+  onTop: () => void
+  onHome: () => void
+  showTop: boolean
 }) {
   const { t } = useTranslation()
-  const [pos, setPos] = useState(() => position ?? defaultFab())
+  const lift = stackLift(showTop)
+  const liftRef = useRef(lift)
+  liftRef.current = lift
+  const [pos, setPos] = useState(() => {
+    const seed = position ?? defaultFab(lift)
+    return snap(seed.x, seed.y, lift)
+  })
   const posRef = useRef(pos)
-  const drag = useRef<{ dx: number; dy: number; x: number; y: number; moved: boolean } | null>(null)
+  const drag = useRef<{ dx: number; dy: number; x: number; y: number; moved: boolean; action: string } | null>(null)
 
   useEffect(() => {
-    const onResize = () => {
-      const snapped = snap(posRef.current.x, posRef.current.y)
+    const place = () => {
+      const snapped = snap(posRef.current.x, posRef.current.y, liftRef.current)
       posRef.current = snapped
       setPos(snapped)
     }
-    window.addEventListener('resize', onResize)
-    return () => window.removeEventListener('resize', onResize)
-  }, [])
+    place()
+    window.addEventListener('resize', place)
+    return () => window.removeEventListener('resize', place)
+  }, [showTop])
 
   function onPointerDown(event: ReactPointerEvent<HTMLButtonElement>) {
-    drag.current = { dx: event.clientX - pos.x, dy: event.clientY - pos.y, x: event.clientX, y: event.clientY, moved: false }
+    drag.current = {
+      dx: event.clientX - posRef.current.x,
+      dy: event.clientY - posRef.current.y,
+      x: event.clientX,
+      y: event.clientY,
+      moved: false,
+      action: event.currentTarget.dataset.action ?? 'menu',
+    }
     event.currentTarget.setPointerCapture(event.pointerId)
   }
 
@@ -65,11 +90,9 @@ export function ReadingFab({
     const current = drag.current
     if (!current) return
     if (Math.hypot(event.clientX - current.x, event.clientY - current.y) > 8) current.moved = true
-    const maxX = window.innerWidth - FAB_SIZE
-    const maxY = window.innerHeight - FAB_SIZE
     const next = {
-      x: Math.min(Math.max(0, event.clientX - current.dx), maxX),
-      y: Math.min(Math.max(0, event.clientY - current.dy), maxY),
+      x: Math.min(Math.max(0, event.clientX - current.dx), window.innerWidth - FAB_SIZE),
+      y: Math.min(Math.max(liftRef.current, event.clientY - current.dy), window.innerHeight - FAB_SIZE),
     }
     posRef.current = next
     setPos(next)
@@ -80,37 +103,71 @@ export function ReadingFab({
     drag.current = null
     if (!current) return
     if (!current.moved) {
-      onToggle()
+      if (current.action === 'top') onTop()
+      else if (current.action === 'home') onHome()
+      else onToggle()
       return
     }
-    const snapped = snap(posRef.current.x, posRef.current.y)
+    const snapped = snap(posRef.current.x, posRef.current.y, liftRef.current)
     posRef.current = snapped
     setPos(snapped)
     onPosition(snapped)
   }
 
   return createPortal(
-    <button
-      type="button"
-      className={`reading-fab${open ? ' open' : ''}`}
-      style={{ left: pos.x, top: pos.y }}
-      aria-label={open ? t('menu.close') : t('menu.open')}
-      aria-expanded={open}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerUp}
-    >
-      {open ? (
+    <div className="reading-fab-stack" style={{ left: pos.x, top: pos.y - lift }}>
+      {showTop && (
+      <button
+        type="button"
+        className="reading-fab"
+        data-action="top"
+        aria-label={t('menu.toTop')}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+      >
         <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M6 6l12 12M18 6L6 18" />
+          <path d="M12 19V6M7 11l5-5 5 5" />
         </svg>
-      ) : (
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M5 7h14M5 12h14M5 17h14" />
-        </svg>
+      </button>
       )}
-    </button>,
+      <button
+        type="button"
+        className="reading-fab"
+        data-action="home"
+        aria-label={t('menu.toHome')}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M4 11.5 12 5l8 6.5M7 10.8V19h10v-8.2" />
+        </svg>
+      </button>
+      <button
+        type="button"
+        className={`reading-fab${open ? ' open' : ''}`}
+        data-action="menu"
+        aria-label={open ? t('menu.close') : t('menu.open')}
+        aria-expanded={open}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+      >
+        {open ? (
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6 6l12 12M18 6L6 18" />
+          </svg>
+        ) : (
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 7h14M5 12h14M5 17h14" />
+          </svg>
+        )}
+      </button>
+    </div>,
     document.body,
   )
 }
@@ -332,7 +389,10 @@ export function ReaderMenu({
                   type="button"
                   className={`choice theme-${id}${settings.theme === id ? ' selected' : ''}`}
                   aria-pressed={settings.theme === id}
-                  onClick={() => onSettings({ theme: id })}
+                  onClick={() => {
+                    if (id === 'day' || id === 'night') setAppearance(id)
+                    else onSettings({ theme: 'sepia' })
+                  }}
                 >
                   {t(`menu.${id}`)}
                 </button>
