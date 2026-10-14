@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { IMPORT_ACCEPT } from '../lib/library'
 import './DropZone.css'
 
 export function DropZone({ onFile }: { onFile: (file: File) => void }) {
@@ -33,7 +34,7 @@ export function DropZone({ onFile }: { onFile: (file: File) => void }) {
       <input
         ref={inputRef}
         type="file"
-        accept="application/pdf,.pdf"
+        accept={IMPORT_ACCEPT}
         hidden
         onChange={(e) => {
           const file = e.target.files?.[0]

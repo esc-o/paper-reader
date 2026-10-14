@@ -10,7 +10,7 @@ export type DictionaryEntry = {
 
 export type LookupResult =
   | { kind: 'dictionary'; entry: DictionaryEntry }
-  | { kind: 'translation'; source: string; translated: string; truncated: boolean; notice?: string }
+  | { kind: 'translation'; source: string; translated: string; truncated: boolean; notice?: string; local?: boolean }
 
 export class LookupError extends Error {}
 
@@ -220,7 +220,10 @@ async function translate(
   const truncated = query.length < source.length
   if (truncated) query = query.replace(/\s+\S*$/, '')
 
-  const params = new URLSearchParams({ q: query, langpair: 'en|zh-CN' })
+  const pair = targetLangpair()
+  if (!pair) return { kind: 'translation', source: query, translated: query, truncated, local: true }
+
+  const params = new URLSearchParams({ q: query, langpair: pair })
   const res = await request(`https://api.mymemory.translated.net/get?${params}`, signal, FALLBACK_TIMEOUT_MS)
   if (!res) throw new LookupError(i18n.t('lookup.offline'))
   if (!res.ok) throw new LookupError(i18n.t('lookup.translateStatus', { status: res.status }))
@@ -243,10 +246,32 @@ async function translate(
 
 const GLOSS_KEY = 'paper-reader.gloss'
 
+export type UiLanguage = 'zh' | 'en' | 'ko' | 'es'
+
+export function glossLanguage(): UiLanguage {
+  const lng = i18n.language.toLowerCase()
+  if (lng.startsWith('zh')) return 'zh'
+  if (lng.startsWith('ko')) return 'ko'
+  if (lng.startsWith('es')) return 'es'
+  return 'en'
+}
+
+function targetLangpair(): string | null {
+  const lang = glossLanguage()
+  if (lang === 'zh') return 'en|zh-CN'
+  if (lang === 'ko') return 'en|ko'
+  if (lang === 'es') return 'en|es'
+  return null
+}
+
+function glossCacheKey(text: string): string {
+  return `${glossLanguage()}\u0000${text}`
+}
+
 function readGloss(text: string): string | null {
   try {
     const all = JSON.parse(localStorage.getItem(GLOSS_KEY) || '{}') as Record<string, string>
-    return all[text] ?? null
+    return all[glossCacheKey(text)] ?? null
   } catch {
     return null
   }
@@ -255,11 +280,12 @@ function readGloss(text: string): string | null {
 function writeGloss(text: string, gloss: string): void {
   try {
     const all = JSON.parse(localStorage.getItem(GLOSS_KEY) || '{}') as Record<string, string>
-    if (!Object.prototype.hasOwnProperty.call(all, text) && Object.keys(all).length >= CACHE_LIMIT) {
+    const key = glossCacheKey(text)
+    if (!Object.prototype.hasOwnProperty.call(all, key) && Object.keys(all).length >= CACHE_LIMIT) {
       const oldest = Object.keys(all)[0]
       if (oldest) delete all[oldest]
     }
-    all[text] = gloss
+    all[key] = gloss
     localStorage.setItem(GLOSS_KEY, JSON.stringify(all))
   } catch {
     // A full localStorage should not hide the English definition.
@@ -269,7 +295,7 @@ function writeGloss(text: string, gloss: string): void {
 const LOOKED_KEY = 'paper-reader.looked-up'
 const LOOKED_EVENT = 'paper-reader-lookups'
 
-type SavedLookup = { gloss: string; zh?: string }
+type SavedLookup = { gloss: string; zh?: string; native?: string; lang?: UiLanguage }
 
 export type LookedUpWord = { word: string; gloss: string }
 
@@ -282,14 +308,21 @@ function readSavedLookups(): Record<string, SavedLookup> {
   }
 }
 
+function nativeOf(saved: SavedLookup): { text: string; lang: UiLanguage } | null {
+  const text = (saved.native ?? saved.zh)?.trim()
+  if (!text) return null
+  const lang = saved.lang ?? (saved.zh ? 'zh' : glossLanguage())
+  return { text, lang }
+}
+
 function displayGloss(saved: SavedLookup): string {
   const gloss = saved.gloss.trim()
-  const zh = saved.zh?.trim()
-  if (i18n.language.startsWith('zh')) {
-    if (zh && gloss && zh !== gloss) return `${zh}\n${gloss}`
-    return zh || gloss
+  const native = nativeOf(saved)
+  if (glossLanguage() !== 'en' && native && native.lang === glossLanguage()) {
+    if (gloss && native.text !== gloss) return `${native.text}\n${gloss}`
+    return native.text || gloss
   }
-  return gloss || zh || ''
+  return gloss || ''
 }
 
 function glossFromEntry(entry: DictionaryEntry): SavedLookup | null {
@@ -297,8 +330,9 @@ function glossFromEntry(entry: DictionaryEntry): SavedLookup | null {
   const definition = meaning?.definitions[0]?.definition?.trim()
   if (!definition) return null
   const gloss = meaning.partOfSpeech ? `${meaning.partOfSpeech} · ${definition}` : definition
-  const zh = readGloss(definition)?.trim()
-  return { gloss, zh: zh && zh !== definition ? zh : undefined }
+  const native = readGloss(definition)?.trim()
+  const lang = glossLanguage()
+  return { gloss, native: native && native !== definition && lang !== 'en' ? native : undefined, lang }
 }
 
 /** Words the reader has looked up, with a short gloss for the hover tip. */
@@ -323,12 +357,19 @@ export function listLookedUp(): LookedUpWord[] {
 export function rememberLookup(word: string, saved: SavedLookup): void {
   const key = normalizeWord(word)
   const gloss = saved.gloss.replace(/\s+/g, ' ').trim().slice(0, 240)
-  const zh = saved.zh?.replace(/\s+/g, ' ').trim().slice(0, 240)
-  if (!key || (!gloss && !zh)) return
+  const native = (saved.native ?? saved.zh)?.replace(/\s+/g, ' ').trim().slice(0, 240)
+  const lang = saved.lang ?? (saved.zh ? 'zh' : glossLanguage())
+  if (!key || (!gloss && !native)) return
   const all = readSavedLookups()
   const prev = all[key]
-  if (prev && prev.gloss === gloss && prev.zh === zh) return
-  all[key] = { gloss, zh: zh || undefined }
+  const prevNative = prev?.native ?? prev?.zh
+  if (prev && prev.gloss === gloss && prevNative === native && (prev.lang ?? 'zh') === lang) return
+  all[key] = {
+    gloss,
+    native: native || undefined,
+    lang: native ? lang : undefined,
+    zh: lang === 'zh' ? native || undefined : undefined,
+  }
   try {
     localStorage.setItem(LOOKED_KEY, JSON.stringify(all))
   } catch {
@@ -351,7 +392,7 @@ export function useLookups(): LookedUpWord[] {
   return words
 }
 
-/** Chinese gloss for one English definition. Cached in this browser. */
+/** Gloss in the current interface language. Cached in this browser, one entry per language. */
 export async function translateGloss(text: string, signal: AbortSignal): Promise<string> {
   const source = text.replace(/\s+/g, ' ').trim()
   if (!source) return ''
@@ -362,3 +403,4 @@ export async function translateGloss(text: string, signal: AbortSignal): Promise
   if (gloss) writeGloss(source, gloss)
   return gloss
 }
+

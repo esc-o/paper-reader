@@ -9,6 +9,7 @@ import {
   listReadingTime,
   listTags,
   listTombstones,
+  putTombstone,
   removeAnnotationLocal,
   removeBookLocal,
   removeFolderLocal,
@@ -19,7 +20,7 @@ import {
   saveReadingTime,
   saveTag,
 } from './db'
-import { runSilently, notifyLibrary } from './changes'
+import { consumeFollowUp, runSilently, notifyLibrary } from './changes'
 import { loadSettings, saveSettings, syncedSettings } from './settings'
 import type { ReaderSettings } from './settings'
 import { supabase } from './supabase'
@@ -78,7 +79,7 @@ export async function syncNow(): Promise<void> {
     console.error(error)
   } finally {
     running = false
-    if (queued) {
+    if (queued || consumeFollowUp()) {
       queued = false
       void syncNow()
     }
@@ -91,9 +92,27 @@ async function merge(userId: string): Promise<void> {
   await mergeSettings(userId)
   await mergeReadingTime(userId)
   try {
+    await pullAccountLibrary(userId)
+  } catch (error) {
+    console.error(error)
+  }
+  try {
     await mergeFolders(userId)
+  } catch (error) {
+    console.error(error)
+  }
+  try {
     await mergeTags(userId)
+  } catch (error) {
+    console.error(error)
+  }
+  try {
     await mergeLabels(userId)
+  } catch (error) {
+    console.error(error)
+  }
+  try {
+    await pushAccountLibrary(userId)
   } catch (error) {
     console.error(error)
   }
@@ -173,7 +192,7 @@ async function pushBook(userId: string, book: Book, stamp: number): Promise<void
   const when = stamp || Date.now()
   const { error } = await client.from('books').upsert(bookRow(userId, book, when, null), { onConflict: 'user_id,id' })
   if (error) throw error
-  if (book.updatedAt !== when) await saveBook({ ...book, updatedAt: when })
+  if (book.updatedAt !== when) await saveBook({ ...book, updatedAt: when }, false)
 }
 
 async function pushDeletedBook(userId: string, id: string, stamp: number): Promise<void> {
@@ -216,7 +235,7 @@ async function applyBook(local: Book, row: RemoteBook): Promise<void> {
     toc: local.paragraphs.length > 0 ? local.toc : (row.toc ?? local.toc),
     updatedAt: ms(row.updated_at),
     needsFile: local.needsFile && local.paragraphs.length === 0,
-  })
+  }, false)
 }
 
 async function savePlaceholder(row: RemoteBook): Promise<void> {
@@ -236,7 +255,7 @@ async function savePlaceholder(row: RemoteBook): Promise<void> {
     needsFile: true,
     updatedAt: ms(row.updated_at),
   }
-  await saveBook(book)
+  await saveBook(book, false)
 }
 
 async function mergeAnnotations(userId: string): Promise<void> {
@@ -259,7 +278,7 @@ async function mergeAnnotations(userId: string): Promise<void> {
       continue
     }
     if (!row || annotation.updatedAt > ms(row.updated_at)) await pushAnnotation(userId, annotation)
-    else if (!row.deleted_at && ms(row.updated_at) > annotation.updatedAt) await saveAnnotation(normalize(row))
+    else if (!row.deleted_at && ms(row.updated_at) > annotation.updatedAt) await saveAnnotation(normalize(row), false)
   }
 
   for (const [id, tomb] of tombs) {
@@ -267,13 +286,13 @@ async function mergeAnnotations(userId: string): Promise<void> {
     if (!row || tomb.updatedAt > ms(row.updated_at)) await pushDeletedAnnotation(userId, tomb)
     else if (!row.deleted_at && ms(row.updated_at) > tomb.updatedAt) {
       await deleteTombstone(tomb.key)
-      await saveAnnotation(normalize(row))
+      await saveAnnotation(normalize(row), false)
     }
   }
 
   for (const row of remote) {
     if (row.deleted_at || localIds.has(row.id) || tombs.has(row.id)) continue
-    await saveAnnotation(normalize(row))
+    await saveAnnotation(normalize(row), false)
   }
 }
 
@@ -350,10 +369,13 @@ async function mergeSettings(userId: string): Promise<void> {
 async function pushSettings(userId: string, settings: ReaderSettings): Promise<void> {
   const client = supabase
   if (!client) return
+  const { data, error: readError } = await client.from('reader_settings').select('payload').eq('user_id', userId).maybeSingle()
+  if (readError) throw readError
+  const previous = data && typeof data.payload === 'object' && data.payload ? data.payload : {}
   const { error } = await client.from('reader_settings').upsert(
     {
       user_id: userId,
-      payload: syncedSettings(settings),
+      payload: { ...previous, ...syncedSettings(settings) },
       updated_at: new Date(settings.updatedAt || Date.now()).toISOString(),
     },
     { onConflict: 'user_id' },
@@ -376,18 +398,18 @@ async function mergeReadingTime(userId: string): Promise<void> {
     const stamp = record.updatedAt ?? 0
     if (!row) {
       const stamped = { ...record, updatedAt: stamp || Date.now() }
-      if (!record.updatedAt) await saveReadingTime(stamped)
+      if (!record.updatedAt) await saveReadingTime(stamped, false)
       await pushReading(userId, stamped)
     } else if (stamp > ms(row.updated_at)) {
       await pushReading(userId, { ...record, updatedAt: stamp })
     } else if (ms(row.updated_at) > stamp) {
-      await saveReadingTime({ date: row.date, seconds: row.seconds, updatedAt: ms(row.updated_at) })
+      await saveReadingTime({ date: row.date, seconds: row.seconds, updatedAt: ms(row.updated_at) }, false)
     }
   }
 
   for (const row of remote) {
     if (localDates.has(row.date)) continue
-    await saveReadingTime({ date: row.date, seconds: row.seconds, updatedAt: ms(row.updated_at) })
+    await saveReadingTime({ date: row.date, seconds: row.seconds, updatedAt: ms(row.updated_at) }, false)
   }
 }
 
@@ -425,7 +447,7 @@ async function mergeFolders(userId: string): Promise<void> {
       continue
     }
     if (!row || folder.updatedAt > ms(row.updated_at)) await pushFolder(userId, folder)
-    else if (!row.deleted_at && ms(row.updated_at) > folder.updatedAt) await saveFolder(folderFrom(row))
+    else if (!row.deleted_at && ms(row.updated_at) > folder.updatedAt) await saveFolder(folderFrom(row), false)
   }
 
   for (const [id, tomb] of tombs) {
@@ -433,13 +455,13 @@ async function mergeFolders(userId: string): Promise<void> {
     if (!row || tomb.updatedAt > ms(row.updated_at)) await pushDeletedFolder(userId, tomb)
     else if (!row.deleted_at && ms(row.updated_at) > tomb.updatedAt) {
       await deleteTombstone(tomb.key)
-      await saveFolder(folderFrom(row))
+      await saveFolder(folderFrom(row), false)
     }
   }
 
   for (const row of remote) {
     if (row.deleted_at || localIds.has(row.id) || tombs.has(row.id)) continue
-    await saveFolder(folderFrom(row))
+    await saveFolder(folderFrom(row), false)
   }
 }
 
@@ -487,7 +509,7 @@ async function mergeTags(userId: string): Promise<void> {
       continue
     }
     if (!row || tag.updatedAt > ms(row.updated_at)) await pushTag(userId, tag)
-    else if (!row.deleted_at && ms(row.updated_at) > tag.updatedAt) await saveTag(tagFrom(row))
+    else if (!row.deleted_at && ms(row.updated_at) > tag.updatedAt) await saveTag(tagFrom(row), false)
   }
 
   for (const [id, tomb] of tombs) {
@@ -495,13 +517,13 @@ async function mergeTags(userId: string): Promise<void> {
     if (!row || tomb.updatedAt > ms(row.updated_at)) await pushDeletedTag(userId, tomb)
     else if (!row.deleted_at && ms(row.updated_at) > tomb.updatedAt) {
       await deleteTombstone(tomb.key)
-      await saveTag(tagFrom(row))
+      await saveTag(tagFrom(row), false)
     }
   }
 
   for (const row of remote) {
     if (row.deleted_at || localIds.has(row.id) || tombs.has(row.id)) continue
-    await saveTag(tagFrom(row))
+    await saveTag(tagFrom(row), false)
   }
 }
 
@@ -557,34 +579,41 @@ async function mergeLabels(userId: string): Promise<void> {
   for (const book of books) {
     const row = remoteById.get(book.id)
     const stamp = book.classifyUpdatedAt ?? 0
+    const tagIds = tagIdList(book.tagIds)
+    const hasLabel = stamp > 0 || tagIds.length > 0 || Boolean(book.folderId) || book.year != null
     if (!row) {
-      if (stamp > 0) await pushLabel(userId, book, stamp)
+      if (!hasLabel) continue
+      const when = stamp || Date.now()
+      const labeled = { ...book, tagIds, classifyUpdatedAt: when }
+      if (when !== stamp) await saveBook(labeled, false)
+      await pushLabel(userId, labeled, when)
       continue
     }
-    if (stamp > ms(row.updated_at)) await pushLabel(userId, book, stamp)
+    if (stamp > ms(row.updated_at)) await pushLabel(userId, { ...book, tagIds }, stamp)
     else if (ms(row.updated_at) > stamp) {
       await saveBook({
         ...book,
         folderId: row.folder_id,
-        tagIds: row.tag_ids ?? [],
+        tagIds: tagIdList(row.tag_ids),
         year: row.year,
         classifyUpdatedAt: ms(row.updated_at),
-      })
+      }, false)
     }
   }
 
   const folderIds = new Set((await listFolders()).map((folder) => folder.id))
   const tagIds = new Set((await listTags()).map((tag) => tag.id))
   for (const book of await listBooks()) {
-    const nextTags = (book.tagIds ?? []).filter((id) => tagIds.has(id))
+    const currentTags = tagIdList(book.tagIds)
+    const nextTags = currentTags.filter((id) => tagIds.has(id))
     const folderGone = Boolean(book.folderId) && !folderIds.has(book.folderId ?? '')
-    if (!folderGone && nextTags.length === (book.tagIds ?? []).length) continue
+    if (!folderGone && nextTags.length === currentTags.length) continue
     await saveBook({
       ...book,
       folderId: folderGone ? null : book.folderId,
       tagIds: nextTags,
       classifyUpdatedAt: Date.now(),
-    })
+    }, false)
   }
 }
 
@@ -618,4 +647,260 @@ async function pushReading(userId: string, record: ReadingTimeRecord): Promise<v
     { onConflict: 'user_id,date' },
   )
   if (error) throw error
+}
+
+type CloudFolder = { id: string; name: string; createdAt: number; updatedAt: number; deletedAt: number | null }
+type CloudTagRecord = CloudFolder & { color: string }
+type CloudLabel = { bookId: string; folderId: string | null; tagIds: string[]; year: number | null; updatedAt: number }
+
+function tagIdList(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  return value.filter((id): id is string => typeof id === 'string' && id.length > 0)
+}
+
+function cloudFolders(value: unknown): CloudFolder[] {
+  if (!Array.isArray(value)) return []
+  return value.flatMap((item) => {
+    if (!item || typeof item !== 'object') return []
+    const row = item as Partial<CloudFolder>
+    if (typeof row.id !== 'string' || !row.id) return []
+    return [{
+      id: row.id,
+      name: typeof row.name === 'string' ? row.name : '',
+      createdAt: typeof row.createdAt === 'number' ? row.createdAt : 0,
+      updatedAt: typeof row.updatedAt === 'number' ? row.updatedAt : 0,
+      deletedAt: typeof row.deletedAt === 'number' ? row.deletedAt : null,
+    }]
+  })
+}
+
+function cloudTags(value: unknown): CloudTagRecord[] {
+  if (!Array.isArray(value)) return []
+  return value.flatMap((item) => {
+    if (!item || typeof item !== 'object') return []
+    const row = item as Partial<CloudTagRecord>
+    if (typeof row.id !== 'string' || !row.id) return []
+    return [{
+      id: row.id,
+      name: typeof row.name === 'string' ? row.name : '',
+      color: typeof row.color === 'string' ? row.color : 'yellow',
+      createdAt: typeof row.createdAt === 'number' ? row.createdAt : 0,
+      updatedAt: typeof row.updatedAt === 'number' ? row.updatedAt : 0,
+      deletedAt: typeof row.deletedAt === 'number' ? row.deletedAt : null,
+    }]
+  })
+}
+
+function cloudLabels(value: unknown): CloudLabel[] {
+  if (!Array.isArray(value)) return []
+  return value.flatMap((item) => {
+    if (!item || typeof item !== 'object') return []
+    const row = item as Partial<CloudLabel>
+    if (typeof row.bookId !== 'string' || !row.bookId) return []
+    return [{
+      bookId: row.bookId,
+      folderId: typeof row.folderId === 'string' ? row.folderId : null,
+      tagIds: tagIdList(row.tagIds),
+      year: typeof row.year === 'number' ? row.year : null,
+      updatedAt: typeof row.updatedAt === 'number' ? row.updatedAt : 0,
+    }]
+  })
+}
+
+async function accountRow(userId: string): Promise<{ payload: Record<string, unknown>; updatedAt: string | null }> {
+  const client = supabase
+  if (!client) return { payload: {}, updatedAt: null }
+  const { data, error } = await client.from('reader_settings').select('payload, updated_at').eq('user_id', userId).maybeSingle()
+  if (error) throw error
+  const payload = data?.payload
+  const updatedAt = data && typeof data.updated_at === 'string' ? data.updated_at : null
+  return { payload: payload && typeof payload === 'object' ? { ...payload } : {}, updatedAt }
+}
+
+/** Copies folders, tags, and book labels out of the account payload when they are newer. */
+async function pullAccountLibrary(userId: string): Promise<void> {
+  const { payload } = await accountRow(userId)
+  const tombs = await listTombstones()
+  const folderTombs = new Map(tombs.filter((tomb) => tomb.kind === 'folder').map((tomb) => [tomb.id, tomb]))
+  const tagTombs = new Map(tombs.filter((tomb) => tomb.kind === 'tag').map((tomb) => [tomb.id, tomb]))
+
+  for (const folder of cloudFolders(payload.folders)) {
+    if (folder.deletedAt) {
+      const local = (await listFolders()).find((item) => item.id === folder.id)
+      if (!local || folder.deletedAt >= local.updatedAt) {
+        if (local) await removeFolderLocal(folder.id)
+        await putTombstone({ key: `folder:${folder.id}`, kind: 'folder', id: folder.id, updatedAt: folder.deletedAt })
+      }
+      continue
+    }
+    const tomb = folderTombs.get(folder.id)
+    if (tomb && tomb.updatedAt >= folder.updatedAt) continue
+    const local = (await listFolders()).find((item) => item.id === folder.id)
+    if (!local || folder.updatedAt > local.updatedAt) await saveFolder(folderFromCloud(folder), false)
+  }
+
+  for (const tag of cloudTags(payload.tags)) {
+    if (tag.deletedAt) {
+      const local = (await listTags()).find((item) => item.id === tag.id)
+      if (!local || tag.deletedAt >= local.updatedAt) {
+        if (local) await removeTagLocal(tag.id)
+        await putTombstone({ key: `tag:${tag.id}`, kind: 'tag', id: tag.id, updatedAt: tag.deletedAt })
+      }
+      continue
+    }
+    const tomb = tagTombs.get(tag.id)
+    if (tomb && tomb.updatedAt >= tag.updatedAt) continue
+    const local = (await listTags()).find((item) => item.id === tag.id)
+    if (!local || tag.updatedAt > local.updatedAt) await saveTag(tagFromCloud(tag), false)
+  }
+
+  const books = new Map((await listBooks()).map((book) => [book.id, book]))
+  for (const label of cloudLabels(payload.labels)) {
+    const book = books.get(label.bookId)
+    if (!book || label.updatedAt <= (book.classifyUpdatedAt ?? 0)) continue
+    await saveBook({
+      ...book,
+      folderId: label.folderId,
+      tagIds: label.tagIds,
+      year: label.year,
+      classifyUpdatedAt: label.updatedAt,
+    }, false)
+  }
+}
+
+/** Writes folders, tags, and which books use them back onto the account. */
+async function pushAccountLibrary(userId: string): Promise<void> {
+  const client = supabase
+  if (!client) return
+  const { payload, updatedAt: rowUpdatedAt } = await accountRow(userId)
+  const tombs = await listTombstones()
+  const books = []
+  for (const book of await listBooks()) {
+    const tagIds = tagIdList(book.tagIds)
+    const hasLabel = (book.classifyUpdatedAt ?? 0) > 0 || tagIds.length > 0 || Boolean(book.folderId) || book.year != null
+    if (hasLabel && !(book.classifyUpdatedAt ?? 0)) {
+      const stamped = { ...book, tagIds, classifyUpdatedAt: Date.now() }
+      await saveBook(stamped, false)
+      books.push(stamped)
+    } else {
+      books.push({ ...book, tagIds })
+    }
+  }
+  const settings = loadSettings()
+  const updatedAt = settings.updatedAt ? new Date(settings.updatedAt).toISOString() : rowUpdatedAt ?? new Date().toISOString()
+  const { error } = await client.from('reader_settings').upsert(
+    {
+      user_id: userId,
+      payload: {
+        ...payload,
+        ...syncedSettings(settings),
+        folders: foldersForAccount(cloudFolders(payload.folders), await listFolders(), tombs),
+        tags: tagsForAccount(cloudTags(payload.tags), await listTags(), tombs),
+        labels: labelsForAccount(cloudLabels(payload.labels), books, tombs),
+      },
+      updated_at: new Date(updatedAt).toISOString(),
+    },
+    { onConflict: 'user_id' },
+  )
+  if (error) throw error
+}
+
+function folderFromCloud(folder: CloudFolder): Folder {
+  return { id: folder.id, name: folder.name, createdAt: folder.createdAt || folder.updatedAt, updatedAt: folder.updatedAt }
+}
+
+function tagFromCloud(tag: CloudTagRecord): Tag {
+  return {
+    id: tag.id,
+    name: tag.name,
+    color: tagColor(tag.color),
+    createdAt: tag.createdAt || tag.updatedAt,
+    updatedAt: tag.updatedAt,
+  }
+}
+
+function foldersForAccount(remote: CloudFolder[], local: Folder[], tombs: Tombstone[]): CloudFolder[] {
+  const byId = new Map(remote.map((folder) => [folder.id, folder]))
+  for (const folder of local) {
+    const prev = byId.get(folder.id)
+    if (prev?.deletedAt && prev.deletedAt >= folder.updatedAt) continue
+    if (!prev || folder.updatedAt >= prev.updatedAt) {
+      byId.set(folder.id, {
+        id: folder.id,
+        name: folder.name,
+        createdAt: folder.createdAt,
+        updatedAt: folder.updatedAt,
+        deletedAt: null,
+      })
+    }
+  }
+  for (const tomb of tombs) {
+    if (tomb.kind !== 'folder') continue
+    const prev = byId.get(tomb.id)
+    if (!prev || tomb.updatedAt >= (prev.deletedAt ?? prev.updatedAt)) {
+      byId.set(tomb.id, {
+        id: tomb.id,
+        name: prev?.name ?? '',
+        createdAt: prev?.createdAt ?? tomb.updatedAt,
+        updatedAt: tomb.updatedAt,
+        deletedAt: tomb.updatedAt,
+      })
+    }
+  }
+  return [...byId.values()]
+}
+
+function tagsForAccount(remote: CloudTagRecord[], local: Tag[], tombs: Tombstone[]): CloudTagRecord[] {
+  const byId = new Map(remote.map((tag) => [tag.id, tag]))
+  for (const tag of local) {
+    const prev = byId.get(tag.id)
+    if (prev?.deletedAt && prev.deletedAt >= tag.updatedAt) continue
+    if (!prev || tag.updatedAt >= prev.updatedAt) {
+      byId.set(tag.id, {
+        id: tag.id,
+        name: tag.name,
+        color: tag.color,
+        createdAt: tag.createdAt,
+        updatedAt: tag.updatedAt,
+        deletedAt: null,
+      })
+    }
+  }
+  for (const tomb of tombs) {
+    if (tomb.kind !== 'tag') continue
+    const prev = byId.get(tomb.id)
+    if (!prev || tomb.updatedAt >= (prev.deletedAt ?? prev.updatedAt)) {
+      byId.set(tomb.id, {
+        id: tomb.id,
+        name: prev?.name ?? '',
+        color: prev?.color ?? 'yellow',
+        createdAt: prev?.createdAt ?? tomb.updatedAt,
+        updatedAt: tomb.updatedAt,
+        deletedAt: tomb.updatedAt,
+      })
+    }
+  }
+  return [...byId.values()]
+}
+
+function labelsForAccount(remote: CloudLabel[], books: Book[], tombs: Tombstone[]): CloudLabel[] {
+  const gone = new Set(tombs.filter((tomb) => tomb.kind === 'book').map((tomb) => tomb.id))
+  const byId = new Map(remote.filter((label) => !gone.has(label.bookId)).map((label) => [label.bookId, label]))
+  for (const book of books) {
+    if (gone.has(book.id)) continue
+    const tagIds = tagIdList(book.tagIds)
+    const stamp = book.classifyUpdatedAt ?? 0
+    const hasLabel = stamp > 0 || tagIds.length > 0 || Boolean(book.folderId) || book.year != null
+    if (!hasLabel) continue
+    const prev = byId.get(book.id)
+    if (prev && prev.updatedAt > stamp) continue
+    byId.set(book.id, {
+      bookId: book.id,
+      folderId: book.folderId ?? null,
+      tagIds,
+      year: book.year ?? null,
+      updatedAt: stamp,
+    })
+  }
+  return [...byId.values()]
 }

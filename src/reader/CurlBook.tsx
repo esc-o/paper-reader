@@ -1,16 +1,11 @@
-import { forwardRef, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
-import { flushSync } from 'react-dom'
-import { createRoot } from 'react-dom/client'
+import { forwardRef, useCallback, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { PageFlip } from 'page-flip/dist/js/page-flip.module.js'
 import type { LookedUpWord } from '../lib/lookup'
 import type { Paragraph } from '../pdf/extractParagraphs'
 import type { Annotation } from '../lib/types'
 import { AnnotatedParagraph } from './AnnotatedParagraph'
 import { anchorOf, indexForPdf, pageIndexForAnchor, paginateParagraphs } from './paginate'
 import type { ReadAnchor, ScreenPage } from './paginate'
-import { anchorFromPoint, anchorFromRect, hasTextSelection } from './selection'
 import type { Anchor } from './selection'
 
 /** Matches the padding on `.curl-page`. */
@@ -56,61 +51,51 @@ export const CurlBook = forwardRef<CurlHandle, Props>(function CurlBook(
 ) {
   const { t } = useTranslation()
   const hostRef = useRef<HTMLDivElement>(null)
-  const flipRef = useRef<PageFlip | null>(null)
   const pagesRef = useRef<ScreenPage[]>([])
   const anchorRef = useRef<ReadAnchor | null>(null)
   const indexRef = useRef(0)
   const pdfPageRef = useRef(pdfPage)
-  const annotationsRef = useRef(annotations)
-  const handlersRef = useRef({ onMarksClick, onCommentClick, onPdfPage })
-  const emptyRef = useRef(t('reader.emptyBook'))
+  const onPdfPageRef = useRef(onPdfPage)
   const [size, setSize] = useState({ width: 0, height: 0 })
   const [pages, setPages] = useState<ScreenPage[]>([])
-  const marksKey = annotations
-    .map((annotation) => `${annotation.id}:${annotation.updatedAt}:${annotation.color ?? ''}:${annotation.comment ?? ''}`)
-    .join('|')
-  const lookupKey = lookups.map((item) => `${item.word}\t${item.gloss}`).join('\n')
-  const lookupsRef = useRef(lookups)
+  const [index, setIndex] = useState(0)
 
   useLayoutEffect(() => {
     pdfPageRef.current = pdfPage
-    annotationsRef.current = annotations
-    lookupsRef.current = lookups
-    handlersRef.current = { onMarksClick, onCommentClick, onPdfPage }
-    emptyRef.current = t('reader.emptyBook')
-  }, [annotations, lookups, onCommentClick, onMarksClick, onPdfPage, pdfPage, t])
+    onPdfPageRef.current = onPdfPage
+  }, [onPdfPage, pdfPage])
 
-  function report(index: number) {
-    indexRef.current = index
-    const page = pagesRef.current[index]
+  const show = useCallback((next: number) => {
+    const count = pagesRef.current.length
+    if (count === 0) return false
+    const at = Math.min(Math.max(0, next), count - 1)
+    indexRef.current = at
+    const page = pagesRef.current[at]
     const anchor = anchorOf(page)
     if (anchor) anchorRef.current = anchor
+    setIndex(at)
     const nextPdf = page?.slices[0]?.paragraph.startPage
-    if (nextPdf) handlersRef.current.onPdfPage(nextPdf)
-  }
+    if (nextPdf) onPdfPageRef.current(nextPdf)
+    return true
+  }, [])
 
   useImperativeHandle(ref, () => ({
     flip(delta: number) {
-      if (delta > 0) flipRef.current?.flipNext('bottom')
-      else flipRef.current?.flipPrev('top')
+      show(indexRef.current + (delta > 0 ? 1 : -1))
     },
     jumpToPdf(target: number) {
-      const index = indexForPdf(pagesRef.current, target)
-      anchorRef.current = anchorOf(pagesRef.current[index])
-      flipRef.current?.turnToPage(index)
-      report(index)
+      const next = indexForPdf(pagesRef.current, target)
+      anchorRef.current = anchorOf(pagesRef.current[next])
+      show(next)
     },
     jumpToText(paragraphId: number, charOffset: number) {
-      const pages = pagesRef.current
-      const flip = flipRef.current
-      if (!flip || pages.length === 0) return false
-      const index = pageIndexForAnchor(pages, { paragraphId, charOffset }, pdfPageRef.current)
-      anchorRef.current = anchorOf(pages[index])
-      if (flip.getCurrentPageIndex() !== index) flip.turnToPage(index)
-      report(index)
+      if (pagesRef.current.length === 0) return false
+      const next = pageIndexForAnchor(pagesRef.current, { paragraphId, charOffset }, pdfPageRef.current)
+      anchorRef.current = anchorOf(pagesRef.current[next])
+      show(next)
       return true
     },
-  }))
+  }), [show])
 
   useLayoutEffect(() => {
     const host = hostRef.current
@@ -136,160 +121,47 @@ export const CurlBook = forwardRef<CurlHandle, Props>(function CurlBook(
       contentWidth: Math.max(40, size.width - margin * 2),
       contentHeight: Math.max(40, size.height - PAD_TOP - PAD_BOTTOM - 8),
     })
-    const index = pageIndexForAnchor(next, anchorRef.current, pdfPageRef.current)
-    indexRef.current = index
-    if (!anchorRef.current) anchorRef.current = anchorOf(next[index])
+    const at = pageIndexForAnchor(next, anchorRef.current, pdfPageRef.current)
     pagesRef.current = next
+    if (!anchorRef.current) anchorRef.current = anchorOf(next[at])
     setPages(next)
-  }, [paragraphs, size, margin, fontSize, lineHeight, fontFamily])
+    show(at)
+  }, [fontFamily, fontSize, lineHeight, margin, paragraphs, show, size])
 
-  useLayoutEffect(() => {
-    const host = hostRef.current
-    if (!host || pages.length === 0 || size.width < 80 || size.height < 80) return
-    let cancelled = false
-    let flip: PageFlip | null = null
-    let book: HTMLElement | null = null
-    let root: ReturnType<typeof createRoot> | null = null
-
-    const onPointerUp = (event: PointerEvent) => {
-      const target = event.target
-      if (!(target instanceof Element) || hasTextSelection()) return
-      const comment = target.closest<HTMLElement>('[data-comment-id]')
-      if (comment?.dataset.commentId) {
-        handlersRef.current.onCommentClick(comment.dataset.commentId, anchorFromRect(comment.getBoundingClientRect()))
-        return
+  const annotationsByParagraph = useMemo(() => {
+    const map = new Map<number, Annotation[]>()
+    for (const annotation of annotations) {
+      for (const paragraphId of new Set(annotation.ranges.map((range) => range.paragraphId))) {
+        map.set(paragraphId, [...(map.get(paragraphId) ?? []), annotation])
       }
-      const mark = target.closest<HTMLElement>('[data-mark-ids]')
-      const ids = mark?.dataset.markIds?.split(' ').filter(Boolean) ?? []
-      if (ids.length > 0) handlersRef.current.onMarksClick(ids, anchorFromPoint(event.clientX, event.clientY))
     }
-    host.addEventListener('pointerup', onPointerUp)
+    return map
+  }, [annotations])
 
-    // Page content has to be drawn outside React's commit. flushSync during
-    // useLayoutEffect is ignored, so the flip engine would receive empty pages.
-    const timer = window.setTimeout(() => {
-      if (cancelled) return
-      const scratch = document.createElement('div')
-      root = createRoot(scratch)
-      const grouped = groupAnnotations(annotationsRef.current)
-      flushSync(() => {
-        root?.render(
-          <CurlPages
-            pages={pages}
-            annotationsByParagraph={grouped}
-            lookups={lookupsRef.current}
-            emptyLabel={emptyRef.current}
-            onMarksClick={() => undefined}
-            onCommentClick={() => undefined}
-          />,
-        )
-      })
-      const clones = [...scratch.querySelectorAll<HTMLElement>('.curl-page')].map(
-        (page) => page.cloneNode(true) as HTMLElement,
-      )
-      root.unmount()
-      root = null
-      if (cancelled || clones.length === 0) return
+  const page = pages[index]
 
-      book = document.createElement('div')
-      book.className = 'curl-book'
-      for (const clone of clones) book.appendChild(clone)
-      host.replaceChildren(book)
-      try {
-        flip = new PageFlip(book, {
-          width: size.width,
-          height: size.height,
-          size: 'fixed',
-          usePortrait: true,
-          showCover: false,
-          mobileScrollSupport: true,
-          disableFlipByClick: true,
-          swipeDistance: 100000,
-          clickEventForward: true,
-          startPage: indexRef.current,
-          drawShadow: true,
-          maxShadowOpacity: 0.4,
-          flippingTime: 700,
-          autoSize: true,
-          showPageCorners: true,
-          useMouseEvents: true,
-        })
-        flip.loadFromHTML(clones)
-        flip.on('flip', (event) => {
-          const index = typeof event.data === 'number' ? event.data : (flip?.getCurrentPageIndex() ?? 0)
-          report(index)
-        })
-        flipRef.current = flip
-      } catch (error) {
-        console.error(error)
-      }
-    }, 0)
-
-    return () => {
-      cancelled = true
-      window.clearTimeout(timer)
-      host.removeEventListener('pointerup', onPointerUp)
-      flipRef.current = null
-      try {
-        root?.unmount()
-      } catch {
-        // The scratch tree is already gone.
-      }
-      try {
-        flip?.destroy()
-      } catch {
-        // destroy() removes its root element; a second pass can throw.
-      }
-      book?.remove()
-    }
-  }, [pages, marksKey, lookupKey, size.width, size.height])
-
-  return <div ref={hostRef} className="curl-host" />
-})
-
-function groupAnnotations(annotations: Annotation[]): Map<number, Annotation[]> {
-  const map = new Map<number, Annotation[]>()
-  for (const annotation of annotations) {
-    for (const paragraphId of new Set(annotation.ranges.map((range) => range.paragraphId))) {
-      map.set(paragraphId, [...(map.get(paragraphId) ?? []), annotation])
-    }
-  }
-  return map
-}
-
-function CurlPages({
-  pages,
-  annotationsByParagraph,
-  lookups,
-  emptyLabel,
-  onMarksClick,
-  onCommentClick,
-}: {
-  pages: ScreenPage[]
-  annotationsByParagraph: Map<number, Annotation[]>
-  lookups: LookedUpWord[]
-  emptyLabel: string
-  onMarksClick: (ids: string[], anchor: Anchor) => void
-  onCommentClick: (id: string, anchor: Anchor) => void
-}): ReactNode {
-  return pages.map((page, index) => (
-    <div className="curl-page" key={index}>
-      {page.slices.length === 0 ? (
-        <p className="reader-message">{emptyLabel}</p>
-      ) : (
-        page.slices.map((slice) => (
-          <AnnotatedParagraph
-            key={`${slice.paragraph.id}-${slice.start}`}
-            paragraph={slice.paragraph}
-            annotations={annotationsByParagraph.get(slice.paragraph.id) ?? []}
-            start={slice.start}
-            end={slice.end}
-            lookups={lookups}
-            onMarksClick={onMarksClick}
-            onCommentClick={onCommentClick}
-          />
-        ))
+  return (
+    <div ref={hostRef} className="curl-host">
+      {page && (
+        <div className="curl-page">
+          {page.slices.length === 0 ? (
+            <p className="reader-message">{t('reader.emptyBook')}</p>
+          ) : (
+            page.slices.map((slice) => (
+              <AnnotatedParagraph
+                key={`${slice.paragraph.id}-${slice.start}`}
+                paragraph={slice.paragraph}
+                annotations={annotationsByParagraph.get(slice.paragraph.id) ?? []}
+                start={slice.start}
+                end={slice.end}
+                lookups={lookups}
+                onMarksClick={onMarksClick}
+                onCommentClick={onCommentClick}
+              />
+            ))
+          )}
+        </div>
       )}
     </div>
-  ))
-}
+  )
+})

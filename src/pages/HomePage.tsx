@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { SiteChrome } from '../components/SiteChrome'
 import { LIBRARY_EVENT } from '../lib/changes'
 import { countAnnotationsByKind, getReadingSeconds, listBooks, listTags } from '../lib/db'
-import { currentChapter, importStatusText, progressPercent, useImportPdf } from '../lib/library'
+import { currentChapter, IMPORT_ACCEPT, importStatusText, progressPercent, useImportPdf } from '../lib/library'
 import { routes } from '../lib/router'
 import { useNarrow } from '../lib/useNarrow'
 import { currentWeek, dayKey, formatLastRead } from '../lib/time'
@@ -121,7 +121,7 @@ export function HomePage() {
           <input
             ref={inputRef}
             type="file"
-            accept="application/pdf,.pdf"
+            accept={IMPORT_ACCEPT}
             hidden
             onChange={(e) => {
               const file = e.target.files?.[0]

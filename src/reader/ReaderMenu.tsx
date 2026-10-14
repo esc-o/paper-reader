@@ -161,15 +161,7 @@ export function ReaderMenu({
   const items = tocItems(book)
   const current = items.reduce((found, item) => (item.pdfPage <= page ? item : found), undefined as TocItem | undefined)
   const usingHeadings = (book.toc ?? []).length === 0
-  const menuBody = useRef<HTMLDivElement>(null)
-
-  function jumpToToc() {
-    const section = document.getElementById('menu-toc')
-    const body = menuBody.current
-    if (!section || !body) return
-    const top = section.getBoundingClientRect().top - body.getBoundingClientRect().top + body.scrollTop
-    body.scrollTo({ top: Math.max(0, top - 8), behavior: 'smooth' })
-  }
+  const [tocOpen, setTocOpen] = useState(false)
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -189,7 +181,12 @@ export function ReaderMenu({
             <button type="button" className="menu-export" onClick={onExport}>
               {t('menu.export')}
             </button>
-            <button type="button" className="menu-export" onClick={jumpToToc}>
+            <button
+              type="button"
+              className={`menu-toc-toggle${tocOpen ? ' open' : ''}`}
+              aria-expanded={tocOpen}
+              onClick={() => setTocOpen((open) => !open)}
+            >
               {t('menu.toc')}
             </button>
           </div>
@@ -197,9 +194,8 @@ export function ReaderMenu({
             ✕
           </button>
         </header>
-        <div className="menu-body" ref={menuBody}>
-          <section className="menu-section" id="menu-toc">
-            <h2 className="card-label">{t('menu.toc')}</h2>
+        {tocOpen && (
+          <div className="menu-toc-panel" id="menu-toc">
             {items.length === 0 ? (
               <p className="menu-empty">{t('menu.noToc')}</p>
             ) : (
@@ -225,8 +221,9 @@ export function ReaderMenu({
                 </ul>
               </>
             )}
-          </section>
-
+          </div>
+        )}
+        <div className="menu-body">
           <section className="menu-section">
             <h2 className="card-label">{t('menu.font')}</h2>
             <ul className="font-list">

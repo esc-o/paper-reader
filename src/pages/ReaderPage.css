@@ -117,6 +117,11 @@
 
 .mode-scroll .reader-content {
   padding-bottom: 30vh;
+  overflow-anchor: none;
+}
+
+.mode-scroll .reader-page {
+  overflow-anchor: none;
 }
 
 .reader-page {
@@ -130,24 +135,6 @@
   letter-spacing: 0.28em;
   color: var(--reader-faint, rgba(43, 34, 32, 0.28));
   user-select: none;
-}
-
-.mode-flip .reader-page[data-turn='1'] {
-  animation: page-flip-next 0.2s ease;
-}
-
-.mode-flip .reader-page[data-turn='-1'] {
-  animation: page-flip-prev 0.2s ease;
-}
-
-@keyframes page-flip-next {
-  from { opacity: 0.35; transform: translateX(18px); }
-  to { opacity: 1; transform: none; }
-}
-
-@keyframes page-flip-prev {
-  from { opacity: 0.35; transform: translateX(-18px); }
-  to { opacity: 1; transform: none; }
 }
 
 .reader-message {
@@ -277,19 +264,6 @@ h3.paragraph-text {
 .pager-button:disabled {
   opacity: 0.3;
   cursor: default;
-}
-
-/* The lookup panel must never cover the text: make room for it. */
-@media (min-width: 900px) {
-  .reader.with-panel {
-    padding-right: 380px;
-  }
-}
-
-@media (max-width: 899px) {
-  .reader.with-panel {
-    padding-bottom: 52vh;
-  }
 }
 
 @media (max-width: 600px) {
@@ -521,14 +495,20 @@ h3.paragraph-text {
 
 .lookup-panel {
   position: fixed;
-  z-index: 30;
+  z-index: 40;
+  top: 8px;
+  left: 8px;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
+  width: min(320px, calc(100vw - 16px));
+  max-height: min(360px, calc(100vh - 16px));
+  overflow: hidden;
   background: #fffdf9;
   color: var(--ink);
-  border-color: var(--line);
-  box-shadow: 0 0 40px rgba(43, 34, 32, 0.15);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: 0 12px 32px rgba(43, 34, 32, 0.16);
 }
 
 html.appearance-night .lookup-panel {
@@ -580,64 +560,14 @@ html.appearance-night .lookup-note.error {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 20px 8px;
+  padding: 12px 12px 4px;
 }
 
 .lookup-body {
   flex: 1;
   overflow-y: auto;
-  padding: 4px 20px 24px;
+  padding: 4px 14px 14px;
   overscroll-behavior: contain;
-}
-
-@media (min-width: 900px) {
-  .lookup-panel {
-    top: 0;
-    right: 0;
-    bottom: 0;
-    width: 380px;
-    border-left: 1px solid var(--line);
-    animation: panel-in-right 0.2s ease-out;
-  }
-
-  html.appearance-night .lookup-panel {
-    border-left-color: #3a322e;
-  }
-}
-
-@media (max-width: 899px) {
-  .lookup-panel {
-    left: 0;
-    right: 0;
-    bottom: 0;
-    height: 50vh;
-    border-radius: var(--radius-card) var(--radius-card) 0 0;
-    animation: panel-in-up 0.22s ease-out;
-    transition: transform 0.2s ease-out;
-  }
-  .lookup-panel.dragging {
-    transition: none;
-  }
-  .sheet-handle {
-    display: block;
-    flex: none;
-    width: 40px;
-    height: 4px;
-    margin: 8px auto 0;
-    border-radius: 2px;
-    background: #d9d4cc;
-  }
-  .lookup-header {
-    padding-top: 8px;
-  }
-}
-
-@keyframes panel-in-right {
-  from { transform: translateX(100%); }
-}
-
-@keyframes panel-in-up {
-  from { transform: translateY(100%); }
 }
 
 .icon-button {

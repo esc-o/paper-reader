@@ -1,25 +1,19 @@
-import { useEffect, useRef, useState } from 'react'
-import type { TouchEvent } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
-import { isSingleEnglishWord, lookup, LookupError, rememberLookup, translateGloss } from '../lib/lookup'
+import { glossLanguage, isSingleEnglishWord, lookup, LookupError, rememberLookup, translateGloss } from '../lib/lookup'
 import type { LookupResult } from '../lib/lookup'
+import type { Anchor } from './selection'
 
 type State =
   | { kind: 'loading' }
   | { kind: 'error'; message: string }
   | { kind: 'done'; result: LookupResult }
 
-const CLOSE_DRAG_DISTANCE = 80
-const SHEET_QUERY = '(max-width: 899px)'
-
-/** Bottom sheet on narrow screens, right-hand side panel on wide ones. Remount (via `key`) for new text. */
-export function LookupPanel({ text, onClose }: { text: string; onClose: () => void }) {
+/** A card beside the selected words. Remount (via `key`) for new text. */
+export function LookupPanel({ text, anchor, onClose }: { text: string; anchor: Anchor; onClose: () => void }) {
   const [state, setState] = useState<State>({ kind: 'loading' })
-  const [drag, setDrag] = useState(0)
   const panelRef = useRef<HTMLElement>(null)
-  const bodyRef = useRef<HTMLDivElement>(null)
-  const dragStart = useRef<number | null>(null)
   const { t } = useTranslation()
 
   useEffect(() => {
@@ -52,25 +46,33 @@ export function LookupPanel({ text, onClose }: { text: string; onClose: () => vo
     }
   }, [onClose])
 
-  function onTouchStart(e: TouchEvent) {
-    if (!window.matchMedia(SHEET_QUERY).matches) return
-    const body = bodyRef.current
-    // Let the content scroll normally; only drag the sheet once it is scrolled to the top.
-    if (body && body.scrollTop > 0 && body.contains(e.target as Node)) return
-    dragStart.current = e.touches[0].clientY
-  }
-
-  function onTouchMove(e: TouchEvent) {
-    if (dragStart.current === null) return
-    setDrag(Math.max(0, e.touches[0].clientY - dragStart.current))
-  }
-
-  function onTouchEnd() {
-    if (dragStart.current === null) return
-    dragStart.current = null
-    if (drag > CLOSE_DRAG_DISTANCE) onClose()
-    else setDrag(0)
-  }
+  useLayoutEffect(() => {
+    const card = panelRef.current
+    if (!card) return
+    const place = (event?: Event) => {
+      if (event?.target instanceof Node && card.contains(event.target)) return
+      const margin = 8
+      const box = card.getBoundingClientRect()
+      const topView = anchor.top - window.scrollY
+      const bottomView = anchor.bottom - window.scrollY
+      const leftView = anchor.left - window.scrollX
+      let top = bottomView + margin
+      if (top + box.height > window.innerHeight - margin) top = topView - box.height - margin
+      if (top < margin) top = Math.max(margin, window.innerHeight - box.height - margin)
+      let left = leftView
+      if (left + box.width > window.innerWidth - margin) left = window.innerWidth - box.width - margin
+      if (left < margin) left = margin
+      card.style.top = `${top}px`
+      card.style.left = `${left}px`
+    }
+    place()
+    window.addEventListener('scroll', place, true)
+    window.addEventListener('resize', place)
+    return () => {
+      window.removeEventListener('scroll', place, true)
+      window.removeEventListener('resize', place)
+    }
+  }, [anchor, state])
 
   const isWord = isSingleEnglishWord(text)
   const shownAsDictionary = state.kind === 'done' ? state.result.kind === 'dictionary' : isWord
@@ -78,21 +80,16 @@ export function LookupPanel({ text, onClose }: { text: string; onClose: () => vo
   return createPortal(
     <aside
       ref={panelRef}
-      className={`lookup-panel${drag > 0 ? ' dragging' : ''}`}
-      style={drag > 0 ? { transform: `translateY(${drag}px)` } : undefined}
+      className="lookup-panel"
       aria-label={shownAsDictionary ? t('toolbar.lookup') : t('toolbar.translate')}
-      onTouchStart={onTouchStart}
-      onTouchMove={onTouchMove}
-      onTouchEnd={onTouchEnd}
     >
-      <div className="sheet-handle" />
       <header className="lookup-header">
         <span className="card-label">{shownAsDictionary ? t('lookup.dictionary') : t('lookup.translate')}</span>
         <button type="button" className="icon-button" aria-label={t('lookup.close')} onClick={onClose}>
           ✕
         </button>
       </header>
-      <div className="lookup-body" ref={bodyRef}>
+      <div className="lookup-body">
         {state.kind === 'loading' && <p className="lookup-note">{t('lookup.loading')}</p>}
         {state.kind === 'error' && <p className="lookup-note error">{state.message}</p>}
         {state.kind === 'done' && <LookupContent result={state.result} />}
@@ -103,8 +100,8 @@ export function LookupPanel({ text, onClose }: { text: string; onClose: () => vo
 }
 
 function LookupContent({ result }: { result: LookupResult }) {
-  const { t, i18n } = useTranslation()
-  const bilingual = i18n.language.startsWith('zh')
+  const { t } = useTranslation()
+  const bilingual = glossLanguage() !== 'en'
   const [glosses, setGlosses] = useState<Record<string, string>>({})
 
   useEffect(() => {
@@ -133,15 +130,14 @@ function LookupContent({ result }: { result: LookupResult }) {
   useEffect(() => {
     if (result.kind === 'translation') {
       if (!isSingleEnglishWord(result.source)) return
-      rememberLookup(result.source, { gloss: '', zh: result.translated })
+      rememberLookup(result.source, { gloss: '', native: result.translated, lang: glossLanguage() })
       return
     }
     const meaning = result.entry.meanings[0]
     const definition = meaning?.definitions[0]?.definition?.trim()
     if (!definition) return
     const gloss = meaning.partOfSpeech ? `${meaning.partOfSpeech} · ${definition}` : definition
-    const zh = glosses[definition]
-    rememberLookup(result.entry.word, { gloss, zh })
+    rememberLookup(result.entry.word, { gloss, native: glosses[definition], lang: glossLanguage() })
   }, [glosses, result])
 
   if (result.kind === 'translation') {
@@ -149,9 +145,9 @@ function LookupContent({ result }: { result: LookupResult }) {
       <>
         {result.notice && <p className="lookup-note">{result.notice}</p>}
         <p className="lookup-original">{result.source}</p>
-        <p className="lookup-translation">{result.translated}</p>
+        {result.translated !== result.source && <p className="lookup-translation">{result.translated}</p>}
         {result.truncated && <p className="lookup-note">{t('lookup.tooLong')}</p>}
-        <p className="lookup-source">{t('lookup.fromMemory')}</p>
+        {!result.local && <p className="lookup-source">{t('lookup.fromMemory')}</p>}
       </>
     )
   }

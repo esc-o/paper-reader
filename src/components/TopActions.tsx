@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { LANGS } from '../i18n'
 import { useAppearance } from '../lib/appearance'
 import { displayName, useAuth } from '../lib/auth'
 import './TopActions.css'
@@ -10,7 +11,9 @@ export function TopActions({ tone = 'dark' }: { tone?: 'dark' | 'light' }) {
   const { mode, setAppearance } = useAppearance()
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
-  const lang = i18n.language.startsWith('zh') ? 'zh' : 'en'
+  const current = LANGS.find((code) => i18n.language.toLowerCase().startsWith(code)) ?? 'en'
+  const next = LANGS[(LANGS.indexOf(current) + 1) % LANGS.length]
+  const short: Record<(typeof LANGS)[number], string> = { zh: '中', en: 'EN', ko: '한', es: 'ES' }
   const name = user ? displayName(user) || t('auth.friend') : ''
 
   useEffect(() => {
@@ -30,7 +33,6 @@ export function TopActions({ tone = 'dark' }: { tone?: 'dark' | 'light' }) {
     }
   }, [open])
 
-  const toEnglish = lang === 'zh'
   return (
     <div className={`top-actions tone-${tone}`} ref={rootRef}>
       <button
@@ -44,10 +46,10 @@ export function TopActions({ tone = 'dark' }: { tone?: 'dark' | 'light' }) {
       <button
         type="button"
         className="lang-switch"
-        aria-label={toEnglish ? t('lang.toEnglish') : t('lang.toChinese')}
-        onClick={() => void i18n.changeLanguage(toEnglish ? 'en' : 'zh')}
+        aria-label={t('lang.switch', { name: t(`lang.${next}`) })}
+        onClick={() => void i18n.changeLanguage(next)}
       >
-        {toEnglish ? 'EN' : '中'}
+        {short[next]}
       </button>
       {user ? (
         <button type="button" className="login-button" onClick={() => setOpen((value) => !value)}>

@@ -6,7 +6,7 @@ import { anchorAnnotations } from '../lib/anchorNotes'
 import { LIBRARY_EVENT } from '../lib/changes'
 import { deleteAnnotation, getBook, listAnnotations, saveAnnotation, saveBook, saveProgress } from '../lib/db'
 import { familyFor, useFonts } from '../lib/fonts'
-import { importPdf, prepareBook } from '../lib/library'
+import { IMPORT_ACCEPT, importPdf, prepareBook } from '../lib/library'
 import { useLookups, type LookedUpWord } from '../lib/lookup'
 import { routes } from '../lib/router'
 import { useStoredSettings } from '../lib/settings'
@@ -36,11 +36,10 @@ type Popover =
 export function ReaderPage({ bookId, noteId }: { bookId: string; noteId?: string }) {
   const [book, setBook] = useState<Book | null | undefined>(undefined)
   const [page, setPage] = useState(1)
-  const [turn, setTurn] = useState<1 | -1 | 0>(0)
   const [annotations, setAnnotations] = useState<Annotation[]>([])
   const [selection, setSelection] = useState<PendingSelection | null>(null)
   const [popover, setPopover] = useState<Popover | null>(null)
-  const [lookupText, setLookupText] = useState<string | null>(null)
+  const [lookup, setLookup] = useState<{ text: string; anchor: Anchor } | null>(null)
   const lookedUp = useLookups()
   const [menuOpen, setMenuOpen] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
@@ -53,6 +52,7 @@ export function ReaderPage({ bookId, noteId }: { bookId: string; noteId?: string
   const contentRef = useRef<HTMLDivElement>(null)
   const curlRef = useRef<CurlHandle>(null)
   const pageRef = useRef(page)
+  const scrollAligned = useRef('')
   const menuOpenRef = useRef(menuOpen)
   const [reimportError, setReimportError] = useState<string | null>(null)
   const [reimporting, setReimporting] = useState(false)
@@ -143,11 +143,10 @@ export function ReaderPage({ bookId, noteId }: { bookId: string; noteId?: string
       clearBrowserSelection()
       setSelection(null)
       setPopover(null)
-      setTurn(next > page ? 1 : -1)
       setPage(next)
       saveProgress(book.id, next)
       if (settings.pageMode === 'scroll') {
-        document.querySelector(`[data-page="${next}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        document.querySelector(`[data-page="${next}"]`)?.scrollIntoView({ block: 'start' })
       } else {
         window.scrollTo({ top: 0 })
       }
@@ -200,14 +199,25 @@ export function ReaderPage({ bookId, noteId }: { bookId: string; noteId?: string
   }, [goToPage, narrow, settings.pageMode])
 
   useEffect(() => {
-    if (!book || settings.pageMode !== 'scroll') return
-    document.querySelector(`[data-page="${pageRef.current}"]`)?.scrollIntoView()
+    if (!book || settings.pageMode !== 'scroll') {
+      scrollAligned.current = ''
+      return
+    }
+    const alignKey = `${book.id}:scroll`
+    if (scrollAligned.current !== alignKey) {
+      const target = document.querySelector(`[data-page="${pageRef.current}"]`)
+      if (target) {
+        scrollAligned.current = alignKey
+        target.scrollIntoView({ block: 'start' })
+      }
+    }
     let ready = false
     const arm = window.setTimeout(() => {
       ready = true
     }, 400)
     const sections = contentRef.current?.querySelectorAll<HTMLElement>('[data-page]')
     if (!sections) return () => window.clearTimeout(arm)
+    const bookId = book.id
     const observer = new IntersectionObserver(
       (entries) => {
         if (!ready) return
@@ -219,7 +229,7 @@ export function ReaderPage({ bookId, noteId }: { bookId: string; noteId?: string
         if (!next || next === pageRef.current) return
         pageRef.current = next
         setPage(next)
-        saveProgress(book.id, next)
+        saveProgress(bookId, next)
       },
       { rootMargin: '-12% 0px -70% 0px', threshold: 0 },
     )
@@ -228,7 +238,7 @@ export function ReaderPage({ bookId, noteId }: { bookId: string; noteId?: string
       window.clearTimeout(arm)
       observer.disconnect()
     }
-  }, [book, settings.pageMode])
+  }, [book?.id, book?.textVersion, book?.numPages, settings.pageMode])
 
   useEffect(() => {
     let pointerIsDown = false
@@ -305,16 +315,10 @@ export function ReaderPage({ bookId, noteId }: { bookId: string; noteId?: string
   }
 
   function openLookup(target: PendingSelection) {
-    setLookupText(target.text)
+    setLookup({ text: target.text, anchor: target.anchor })
     setPopover(null)
     setMenuOpen(false)
     dismissSelection()
-    if (window.matchMedia('(max-width: 899px)').matches) {
-      const visibleTop = target.anchor.top - window.scrollY
-      if (visibleTop > window.innerHeight * 0.4) {
-        requestAnimationFrame(() => window.scrollTo({ top: target.anchor.top - 96, behavior: 'smooth' }))
-      }
-    }
   }
 
   function toggleMenu() {
@@ -422,34 +426,41 @@ export function ReaderPage({ bookId, noteId }: { bookId: string; noteId?: string
   }, [annotations, book, goToPage, narrow, noteId, settings.pageMode])
 
   function onReaderClick(event: ReactMouseEvent) {
-    if (lookupText || menuOpen) return
+    if (lookup || menuOpen) return
     const target = event.target
     if (!(target instanceof Element)) return
     if (target.closest('a, button, input, textarea, .mark, .comment-bubble, .floating, .reading-fab, .pager')) return
     if (hasTextSelection()) return
-    if (narrow) {
-      const now = Date.now()
-      const close =
-        now - lastTapAt.current < 300 &&
-        Math.hypot(event.clientX - lastTapX.current, event.clientY - lastTapY.current) < 36
-      if (close) {
-        window.clearTimeout(tapTimer.current)
-        lastTapAt.current = 0
-        selectWordAt(event.clientX, event.clientY)
+    if (settings.pageMode === 'flip') {
+      const surface = contentRef.current?.getBoundingClientRect()
+      const width = surface && surface.width > 0 ? surface.width : window.innerWidth
+      const origin = surface?.left ?? 0
+      const delta = (event.clientX - origin) / width < 0.5 ? -1 : 1
+      if (narrow) {
+        const now = Date.now()
+        const close =
+          now - lastTapAt.current < 300 &&
+          Math.hypot(event.clientX - lastTapX.current, event.clientY - lastTapY.current) < 36
+        if (close) {
+          window.clearTimeout(tapTimer.current)
+          lastTapAt.current = 0
+          selectWordAt(event.clientX, event.clientY)
+          return
+        }
+        lastTapAt.current = now
+        lastTapX.current = event.clientX
+        lastTapY.current = event.clientY
+        tapTimer.current = window.setTimeout(() => {
+          if (curlRef.current) curlRef.current.flip(delta)
+          else goToPage(pageRef.current + delta)
+        }, 280)
         return
       }
-      lastTapAt.current = now
-      lastTapX.current = event.clientX
-      lastTapY.current = event.clientY
-      const ratio = event.clientX / window.innerWidth
-      if (ratio >= 0.36 && ratio <= 0.64) return
-      const delta = ratio < 0.36 ? -1 : 1
-      tapTimer.current = window.setTimeout(() => {
-        if (curlRef.current) curlRef.current.flip(delta)
-        else goToPage(pageRef.current + delta)
-      }, 280)
+      if (curlRef.current) curlRef.current.flip(delta)
+      else goToPage(pageRef.current + delta)
       return
     }
+    if (narrow) return
     const x = event.clientX / window.innerWidth
     const y = event.clientY / window.innerHeight
     if (x < 0.3 || x > 0.7 || y < 0.22 || y > 0.78) return
@@ -463,7 +474,7 @@ export function ReaderPage({ bookId, noteId }: { bookId: string; noteId?: string
     setPopover({ kind: 'comment', anchor, id })
   }, [])
   const closePopover = useCallback(() => setPopover(null), [])
-  const closeLookup = useCallback(() => setLookupText(null), [])
+  const closeLookup = useCallback(() => setLookup(null), [])
   const closeMenu = useCallback(() => setMenuOpen(false), [])
 
   async function reimportFile(file: File) {
@@ -510,7 +521,7 @@ export function ReaderPage({ bookId, noteId }: { bookId: string; noteId?: string
 
   return (
     <div
-      className={`reader theme-${settings.theme} mode-${settings.pageMode}${curl ? ' curl' : ''}${lookupText ? ' with-panel' : ''}`}
+      className={`reader theme-${settings.theme} mode-${settings.pageMode}${curl ? ' curl' : ''}`}
       style={{
         '--reader-font': `${settings.fontSize}px`,
         '--reader-leading': String(settings.lineHeight),
@@ -535,7 +546,7 @@ export function ReaderPage({ bookId, noteId }: { bookId: string; noteId?: string
               {reimporting ? t('errors.opening') : t('reader.reimportButton')}
               <input
                 type="file"
-                accept="application/pdf,.pdf"
+                accept={IMPORT_ACCEPT}
                 hidden
                 onChange={(event) => {
                   const file = event.target.files?.[0]
@@ -567,7 +578,6 @@ export function ReaderPage({ bookId, noteId }: { bookId: string; noteId?: string
               key={pageNumber}
               book={book}
               pageNumber={pageNumber}
-              turn={turn}
               annotationsByParagraph={annotationsByParagraph}
               lookups={lookedUp}
               onMarksClick={openMarks}
@@ -647,7 +657,7 @@ export function ReaderPage({ bookId, noteId }: { bookId: string; noteId?: string
         />
       )}
 
-      {lookupText && <LookupPanel key={lookupText} text={lookupText} onClose={closeLookup} />}
+      {lookup && <LookupPanel key={lookup.text} text={lookup.text} anchor={lookup.anchor} onClose={closeLookup} />}
 
       <ReadingFab open={menuOpen} position={settings.fab} onPosition={(fab) => updateSettings({ fab })} onToggle={toggleMenu} />
       {menuOpen && (
@@ -672,7 +682,6 @@ export function ReaderPage({ bookId, noteId }: { bookId: string; noteId?: string
 function PageSection({
   book,
   pageNumber,
-  turn,
   annotationsByParagraph,
   lookups,
   onMarksClick,
@@ -680,7 +689,6 @@ function PageSection({
 }: {
   book: Book
   pageNumber: number
-  turn: 1 | -1 | 0
   annotationsByParagraph: Map<number, Annotation[]>
   lookups: LookedUpWord[]
   onMarksClick: (ids: string[], anchor: Anchor) => void
@@ -692,7 +700,7 @@ function PageSection({
   const bookPage = displayPage(pageNumber, book.pageOffset ?? 0)
 
   return (
-    <section className="reader-page" data-page={pageNumber} data-turn={turn}>
+    <section className="reader-page" data-page={pageNumber}>
       <div className="page-sep">— {bookPage} —</div>
       {visible.length === 0 && (
         <p className="reader-message">

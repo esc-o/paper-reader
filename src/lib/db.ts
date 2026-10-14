@@ -60,9 +60,9 @@ export async function getBook(id: string): Promise<Book | undefined> {
   return (await dbPromise).get('books', id)
 }
 
-export async function saveBook(book: Book): Promise<void> {
+export async function saveBook(book: Book, notify = true): Promise<void> {
   await (await dbPromise).put('books', book)
-  notifyLocalChange()
+  if (notify) notifyLocalChange()
 }
 
 export async function saveProgress(bookId: string, page: number): Promise<void> {
@@ -108,9 +108,9 @@ export async function listAllAnnotations(): Promise<Annotation[]> {
   return (await dbPromise).getAll('annotations')
 }
 
-export async function saveAnnotation(annotation: Annotation): Promise<void> {
+export async function saveAnnotation(annotation: Annotation, notify = true): Promise<void> {
   await (await dbPromise).put('annotations', annotation)
-  notifyLocalChange()
+  if (notify) notifyLocalChange()
 }
 
 /** Stores annotations without treating them as an edit. Local offsets can change while the note stays the same. */
@@ -166,9 +166,9 @@ export async function listReadingTime(): Promise<ReadingTimeRecord[]> {
   return (await dbPromise).getAll('readingTime')
 }
 
-export async function saveReadingTime(record: ReadingTimeRecord): Promise<void> {
+export async function saveReadingTime(record: ReadingTimeRecord, notify = true): Promise<void> {
   await (await dbPromise).put('readingTime', record)
-  notifyLocalChange()
+  if (notify) notifyLocalChange()
 }
 
 export async function listFonts(): Promise<StoredFont[]> {
@@ -201,9 +201,9 @@ export async function listFolders(): Promise<Folder[]> {
   return folders.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
 }
 
-export async function saveFolder(folder: Folder): Promise<void> {
+export async function saveFolder(folder: Folder, notify = true): Promise<void> {
   await (await dbPromise).put('folders', folder)
-  notifyLocalChange()
+  if (notify) notifyLocalChange()
 }
 
 export async function removeFolderLocal(id: string): Promise<void> {
@@ -227,9 +227,9 @@ export async function listTags(): Promise<Tag[]> {
   return tags.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
 }
 
-export async function saveTag(tag: Tag): Promise<void> {
+export async function saveTag(tag: Tag, notify = true): Promise<void> {
   await (await dbPromise).put('tags', tag)
-  notifyLocalChange()
+  if (notify) notifyLocalChange()
 }
 
 export async function removeTagLocal(id: string): Promise<void> {

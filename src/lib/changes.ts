@@ -1,10 +1,21 @@
 const listeners = new Set<() => void>()
 let mute = 0
+let followUp = false
 
 /** Local data changed and should be merged to the cloud if someone is signed in. */
 export function notifyLocalChange() {
-  if (mute > 0) return
+  if (mute > 0) {
+    followUp = true
+    return
+  }
   for (const listener of listeners) listener()
+}
+
+/** A change arrived while a merge was running. One more sync should follow. */
+export function consumeFollowUp(): boolean {
+  const pending = followUp
+  followUp = false
+  return pending
 }
 
 export function onLocalChange(listener: () => void): () => void {

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import i18n from '../i18n'
+import { extractMobi, extractTxt, TextImportError } from '../import/textFile'
 import { extractPdf, ExtractionError, TEXT_VERSION } from '../pdf/extractParagraphs'
 import type { Paragraph } from '../pdf/extractParagraphs'
 import { authorsForDoi, doiInText, usableAuthor } from './authors'
@@ -10,8 +11,15 @@ import { yearInTitle } from './shelfQuery'
 import { finalizeParagraphs } from './toc'
 import type { Book } from './types'
 
+export const IMPORT_ACCEPT = 'application/pdf,.pdf,.mobi,application/x-mobipocket-ebook,.txt,text/plain'
+
 export function isPdfFile(file: File): boolean {
   return file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+}
+
+export function isImportable(file: File): boolean {
+  const name = file.name.toLowerCase()
+  return isPdfFile(file) || name.endsWith('.mobi') || name.endsWith('.txt') || file.type.startsWith('text/plain')
 }
 
 /** Returns the id of the (possibly already existing) book for this file. */
@@ -19,7 +27,8 @@ export async function importPdf(
   file: File,
   onProgress?: (page: number, total: number) => void,
 ): Promise<string> {
-  if (!isPdfFile(file)) throw new ExtractionError(i18n.t('errors.notPdf'))
+  if (!isImportable(file)) throw new ExtractionError(i18n.t('errors.notPdf'))
+  if (!isPdfFile(file)) return importTextBook(file)
 
   const buffer = await file.arrayBuffer()
   // Hash before parsing: PDF.js transfers the buffer to its worker and detaches it.
@@ -111,6 +120,57 @@ export function prepareBook(book: Book): { book: Book; changed: boolean } {
     changed: true,
     book: { ...book, paragraphs: result.paragraphs, toc: result.toc, pageOffset: result.pageOffset },
   }
+}
+
+async function importTextBook(file: File): Promise<string> {
+  const buffer = await file.arrayBuffer()
+  const id = await sha256(buffer)
+  const existing = await getBook(id)
+  const current = (existing?.textVersion ?? 0) >= TEXT_VERSION
+  if (existing && !existing.needsFile && existing.paragraphs.length > 0 && current) return id
+
+  let extracted: ReturnType<typeof extractTxt>
+  try {
+    const bytes = new Uint8Array(buffer)
+    extracted = file.name.toLowerCase().endsWith('.mobi') ? extractMobi(bytes, file.name) : extractTxt(bytes, file.name)
+  } catch (error) {
+    if (error instanceof TextImportError) throw new ExtractionError(i18n.t(textErrorKey(error.code)))
+    throw error
+  }
+
+  const now = Date.now()
+  const year = existing?.year ?? yearInTitle(extracted.title)
+  await saveBook({
+    id,
+    fileName: file.name,
+    title: existing?.title || extracted.title,
+    author: existing?.author || extracted.author,
+    description: existing?.description || findDescription(extracted.paragraphs),
+    numPages: extracted.numPages,
+    paragraphs: extracted.paragraphs,
+    toc: extracted.toc,
+    pageOffset: extracted.pageOffset,
+    textVersion: TEXT_VERSION,
+    addedAt: existing?.addedAt ?? now,
+    lastReadAt: existing?.lastReadAt ?? null,
+    currentPage: existing && existing.currentPage <= extracted.numPages ? existing.currentPage : 1,
+    needsFile: false,
+    updatedAt: existing?.updatedAt ?? now,
+    folderId: existing?.folderId ?? null,
+    tagIds: existing?.tagIds ?? [],
+    year,
+    classifyUpdatedAt: existing?.classifyUpdatedAt ?? (year ? now : undefined),
+  })
+  await anchorAnnotations(extracted.paragraphs, await listAnnotations(id))
+  notifyLibrary()
+  return id
+}
+
+function textErrorKey(code: TextImportError['code']): string {
+  if (code === 'encrypted') return 'errors.mobiEncrypted'
+  if (code === 'unsupported') return 'errors.mobiUnsupported'
+  if (code === 'empty') return 'errors.emptyFile'
+  return 'errors.invalid'
 }
 
 function findDescription(paragraphs: Paragraph[]): string {
